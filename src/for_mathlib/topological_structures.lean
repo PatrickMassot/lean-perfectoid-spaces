@@ -127,7 +127,7 @@ instance toplogical_add_group.to_uniform_space : uniform_space G :=
   is_open_uniformity  := 
     begin
       intro S,
-      let S' := λ x, {p : G × G | p.fst = x → p.snd ∈ S},
+      let S' := λ x, {p : G × G | p.1 = x → p.2 ∈ S},
       
       change is_open S ↔ ∀ (x : G), x ∈ S → S' x ∈ (vmap δ (nhds (0 : G))).sets,
       have := calc 
@@ -154,4 +154,28 @@ instance toplogical_add_group.to_uniform_space : uniform_space G :=
             cc } },
       cc 
     end,}
+
+lemma uniformity_eq_vmap_nhds_zero : uniformity = vmap δ (nhds (0 : G)) := rfl
+
+instance topological_add_group_is_uniform : uniform_add_group G := 
+⟨begin
+  rw [uniform_continuous, uniformity_prod_eq_prod],
+  apply tendsto_map',
+  apply tendsto_vmap_iff.2,
+
+  suffices : tendsto (λ (x : (G × G) × G × G), (x.1).2 - (x.1).1 - ((x.2).2 - (x.2).1))
+    (filter.prod uniformity uniformity)
+    (nhds 0),
+  { simpa [(∘), δ] },
+
+  suffices : tendsto (λ (x : (G × G) × G × G), (x.1).2 - (x.1).1 - ((x.2).2 - (x.2).1))
+    (vmap (λ (p : (G × G) × G × G), ((p.1).2 - (p.1).1, (p.2).2 - (p.2).1))
+       (filter.prod (nhds 0) (nhds 0)))
+    (nhds 0),
+  by simpa [(∘), δ, uniformity_eq_vmap_nhds_zero, prod_vmap_vmap_eq, -sub_eq_add_neg],
+  
+  conv { for (nhds _) [3] { rw [show (0:G) = 0 - 0, by simp] }},
+  exact tendsto_sub (tendsto.comp tendsto_vmap tendsto_fst) (tendsto.comp tendsto_vmap tendsto_snd),
+end⟩
+
 end topological_add_comm_group
