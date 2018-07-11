@@ -1,5 +1,7 @@
 import analysis.topology.topological_structures
 
+import for_mathlib.completion
+
 open filter
 
 lemma set.preimage_subset_iff {α : Type*} {β : Type*} {A : set α} {B : set β} {f : α → β} :
@@ -177,5 +179,18 @@ instance topological_add_group_is_uniform : uniform_add_group G :=
   conv { for (nhds _) [3] { rw [show (0:G) = 0 - 0, by simp] }},
   exact tendsto_sub (tendsto.comp tendsto_vmap tendsto_fst) (tendsto.comp tendsto_vmap tendsto_snd),
 end⟩
-
 end topological_add_comm_group
+
+section topological_add_comm_group_completion
+universe u
+variables (G : Type u) [add_comm_group G] [topological_space G] [topological_add_group G]  
+
+open uniform_space
+
+instance completion_group_str : add_comm_group (completion G) := sorry
+
+class is_add_group_hom {α : Type*} {β : Type*} [add_group α] [add_group β] (f : α → β) : Prop :=
+(mul : ∀ a b : α, f (a + b) = f a + f b)
+
+instance to_completion_mph : is_add_group_hom (to_completion G) := sorry
+end topological_add_comm_group_completion
