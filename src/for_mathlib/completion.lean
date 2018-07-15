@@ -1,6 +1,8 @@
 import analysis.topology.uniform_space
 import data.set.function
 
+import for_mathlib.quotient
+
 local attribute [instance] separation_setoid
 
 open Cauchy
@@ -9,13 +11,13 @@ namespace uniform_space
 variables {α : Type*} [uniform_space α]
 variables {β : Type*} [uniform_space β]
 
-lemma separation_rel_of_uniform_continuous {f : α → β} (H : uniform_continuous f) {x y : α} 
+lemma separated_of_uniform_continuous {f : α → β} (H : uniform_continuous f) {x y : α} 
 (h : x ≈ y) : f x ≈ f y :=
 assume _ h', h _ (H h')
 
-lemma apply_eq_of_separated [separated β] {f : α → β} (H : uniform_continuous f) {x y : α} 
+lemma eq_of_separated_of_uniform_continuous [separated β] {f : α → β} (H : uniform_continuous f) {x y : α} 
 (h : x ≈ y) : f x = f y :=
-separated_def.1 (by apply_instance) _ _ $ separation_rel_of_uniform_continuous H h
+separated_def.1 (by apply_instance) _ _ $ separated_of_uniform_continuous H h
 
 variable (α)
 
@@ -43,16 +45,16 @@ begin
   have g₀_unif : uniform_continuous g₀ := 
     uniform_continuous_uniformly_extend uniform_embedding_pure_cauchy pure_cauchy_dense H,
   have compat : ∀ p q : Cauchy α, p ≈ q → g₀ p = g₀ q :=
-    assume p q h, apply_eq_of_separated g₀_unif h, 
+    assume p q h, eq_of_separated_of_uniform_continuous g₀_unif h, 
   let g := quotient.lift g₀ compat,
   existsi g,
   split,
   { intros r r_in,
     rw filter.mem_map,
-    
-    sorry },
+    dsimp[completion],
+    rw quotient.prod_preimage_eq_image g rfl r,
+    exact filter.image_mem_map (g₀_unif r_in) },
   { ext x,
-    apply eq.symm,
-    exact de.ext_e_eq (H.continuous.tendsto x) }
+    exact eq.symm (de.ext_e_eq (H.continuous.tendsto x)) }
 end
 end uniform_space
