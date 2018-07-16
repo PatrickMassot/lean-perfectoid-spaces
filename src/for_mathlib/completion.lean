@@ -2,6 +2,7 @@ import analysis.topology.uniform_space
 import data.set.function
 
 import for_mathlib.quotient
+import for_mathlib.continuity
 
 local attribute [instance] separation_setoid
 
@@ -32,13 +33,22 @@ instance : separated (completion α) := separated_separation
 
 def to_completion : α → completion α := quotient.mk ∘ pure_cauchy
 
+open set
+
+lemma dense_in_completion  : closure (range (to_completion α)) = univ   :=
+begin
+  dsimp[to_completion],
+  rw range_comp,
+  exact dense_of_quotient_dense pure_cauchy_dense
+end
+
 variable {α}
 variables [complete_space β] [separated β] [inhabited β]
 
 open set
 
 theorem completion_ump {f : α → β} (H : uniform_continuous f) :
-∃ g : completion α → β, (uniform_continuous g) ∧ f = g ∘ (to_completion α) :=
+∃! g : completion α → β, (uniform_continuous g) ∧ f = g ∘ (to_completion α) :=
 begin
   let de := uniform_embedding_pure_cauchy.dense_embedding pure_cauchy_dense,
   let g₀ := de.ext f,
@@ -47,14 +57,21 @@ begin
   have compat : ∀ p q : Cauchy α, p ≈ q → g₀ p = g₀ q :=
     assume p q h, eq_of_separated_of_uniform_continuous g₀_unif h, 
   let g := quotient.lift g₀ compat,
+  have g_unif : uniform_continuous g,
+  { intros r r_in,
+      rw filter.mem_map,
+      rw quotient.prod_preimage_eq_image g rfl r,
+      exact filter.image_mem_map (g₀_unif r_in) },
+  have g_factor : f = g ∘ (to_completion α),
+  { ext x,
+      exact eq.symm (de.ext_e_eq (H.continuous.tendsto x)) },
   existsi g,
   split,
-  { intros r r_in,
-    rw filter.mem_map,
-    dsimp[completion],
-    rw quotient.prod_preimage_eq_image g rfl r,
-    exact filter.image_mem_map (g₀_unif r_in) },
-  { ext x,
-    exact eq.symm (de.ext_e_eq (H.continuous.tendsto x)) }
+  { exact ⟨g_unif, g_factor⟩ },
+  { rintro h ⟨h_unif, h_factor⟩,
+    ext x,
+    have closed_eq : is_closed {x | h x = g x} := is_closed_eq h_unif.continuous g_unif.continuous,
+    have eq_on_α : ∀ x, (h ∘ to_completion α) x = (g ∘ to_completion α) x, by cc,
+    apply is_closed_property (dense_in_completion α) closed_eq eq_on_α x }
 end
 end uniform_space
