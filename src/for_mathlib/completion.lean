@@ -23,7 +23,7 @@ a morphism `completion_lift H : completion α → completion β` such that
 `(to_completion β) ∘ f = (completion_lift H) ∘ to_completion α`. This construction is
 compatible with composition.
 
-This formalization is mostly based on N. Bourbaki: General Topology but from a slightly 
+This formalization is mostly based on N. Bourbaki: /General Topology/ but from a slightly 
 different perspective in order to reuse material in analysis.topology.uniform_space.
 -/
 
@@ -42,6 +42,7 @@ open Cauchy
 namespace uniform_space
 variables {α : Type*} [uniform_space α]
 variables {β : Type*} [uniform_space β]
+variables {γ : Type*} [uniform_space γ]
 
 lemma separated_of_uniform_continuous {f : α → β} (H : uniform_continuous f) {x y : α} 
 (h : x ≈ y) : f x ≈ f y :=
@@ -104,9 +105,10 @@ begin
   { exact ⟨to_completion α c⟩ }
 end
 
-
+/-- "Extension" to the completion. 
+    Defined for any map `f` but returns garbage if `f` is not uniformly continuous -/
 noncomputable
-def completion_lift' (f : α → β) : completion α → β :=
+def completion_extension (f : α → β) : completion α → β :=
 if H : uniform_continuous f then 
   let g₀ := (uniform_embedding_pure_cauchy.dense_embedding pure_cauchy_dense).extend f in
   have g₀_unif : uniform_continuous g₀ := 
@@ -117,46 +119,10 @@ if H : uniform_continuous f then
 else
   λ x, f (classical.inhabited_of_nonempty $ nonempty_completion_iff.1 ⟨x⟩).default
 
-/-- Universal mapping property of Hausdorff completion -/
-theorem completion_ump {f : α → β} (H : uniform_continuous f) :
-∃! g : completion α → β, (uniform_continuous g) ∧ f = g ∘ (to_completion α) :=
-begin
-  let de := uniform_embedding_pure_cauchy.dense_embedding pure_cauchy_dense,
-  let g₀ := de.extend f,
-  have g₀_unif : uniform_continuous g₀ := 
-    uniform_continuous_uniformly_extend uniform_embedding_pure_cauchy pure_cauchy_dense H,
-  have compat : ∀ p q : Cauchy α, p ≈ q → g₀ p = g₀ q :=
-    assume p q h, eq_of_separated_of_uniform_continuous g₀_unif h, 
-  let g := quotient.lift g₀ compat,
-  have g_unif : uniform_continuous g,
-  { intros r r_in,
-      rw filter.mem_map,
-      rw quotient.prod_preimage_eq_image g rfl r,
-      exact filter.image_mem_map (g₀_unif r_in) },
-  have g_factor : f = g ∘ (to_completion α),
-  { ext x,
-      exact eq.symm (de.extend_e_eq (H.continuous.tendsto x)) },
-  existsi g,
-  split,
-  { exact ⟨g_unif, g_factor⟩ },
-  { rintro h ⟨h_unif, h_factor⟩,
-    ext x,
-    have closed_eq : is_closed {x | h x = g x} := is_closed_eq h_unif.continuous g_unif.continuous,
-    have eq_on_α : ∀ x, (h ∘ to_completion α) x = (g ∘ to_completion α) x, by cc,
-    apply is_closed_property (to_completion.dense α) closed_eq eq_on_α x }
-end
-
-/-- "Extension" to the completion -/
-noncomputable def completion_extension {f : α → β} (H : uniform_continuous f) : completion α → β :=
-classical.some (completion_ump H)
-
-variables {γ : Type*} [uniform_space γ]
-
 /-- Completion functor acting on morphisms -/
-noncomputable def completion_lift {f : α → γ} (H : uniform_continuous f) : completion α → completion γ :=
-classical.some (completion_ump $ uniform_continuous.comp H (to_completion.uniform_continuous γ))
+noncomputable def completion_lift (f : α → γ) : completion α → completion γ :=
+completion_extension ((to_completion γ) ∘ f)
 end uniform_space
-
 
 namespace completion_extension
 open uniform_space
@@ -165,16 +131,48 @@ variables {β : Type*} [uniform_space β]
 variables [complete_space β] [separated β]
 
 variables {f : α → β} (H : uniform_continuous f)
+include H
 
-lemma lifts : f = (completion_extension H) ∘ to_completion α :=
-(classical.some_spec (completion_ump H)).1.2
+lemma lifts : f = (completion_extension f) ∘ to_completion α :=
+begin
+  unfold completion_extension,
+  simp [H],
+  ext x,
+  let lim := H.continuous.tendsto x,
+  have := (uniform_embedding_pure_cauchy.dense_embedding pure_cauchy_dense).extend_e_eq lim,
+  rw ←this,
+  refl
+end
 
-lemma unique {f' : completion α → β} :
-  uniform_continuous f' → f = (f' ∘ to_completion α) → f' = completion_extension H :=
-assume uc fac, (classical.some_spec (completion_ump H)).2 f' ⟨uc, fac⟩
+lemma uniform_continuity : uniform_continuous (completion_extension f) :=
+begin
+  unfold completion_extension,
+  split_ifs,
+  let g := completion_extension f,
+  intros r r_in,
+  let g₀ := (uniform_embedding_pure_cauchy.dense_embedding pure_cauchy_dense).extend f,
+  have g₀_unif : uniform_continuous g₀ := 
+    uniform_continuous_uniformly_extend uniform_embedding_pure_cauchy pure_cauchy_dense H,
 
-lemma uniform_continuity : uniform_continuous (completion_extension H) :=
-(classical.some_spec (completion_ump H)).1.1
+  rw filter.mem_map,
+  dsimp[completion],
+  rw quotient.prod_preimage_eq_image _ rfl r, 
+  exact filter.image_mem_map (g₀_unif r_in)
+end
+
+lemma unique {h : completion α → β} :
+  uniform_continuous h → f = (h ∘ to_completion α) → h = completion_extension f :=
+begin
+  let g := completion_extension f,
+  have g_unif : uniform_continuous g := uniform_continuity H,
+  have lifsts : f = g ∘ to_completion α := lifts H,
+  intros h_unif h_lifts,
+  change h = g,
+  ext x,
+  have closed_eq : is_closed {x | h x = g x} := is_closed_eq h_unif.continuous g_unif.continuous,
+  have eq_on_α : ∀ x, (h ∘ to_completion α) x = (g ∘ to_completion α) x, by cc,
+  apply is_closed_property (to_completion.dense α) closed_eq eq_on_α x,
+end
 end completion_extension
 
 namespace completion_lift
@@ -186,20 +184,22 @@ variables {γ : Type*} [uniform_space γ]
 variables {f : α → β} (H : uniform_continuous f)
 variables {g : β → γ} (H' : uniform_continuous g)
 
-lemma lifts : (to_completion β) ∘ f = (completion_lift H) ∘ to_completion α :=
+lemma lifts : (to_completion β) ∘ f = (completion_lift f) ∘ to_completion α :=
 completion_extension.lifts $ uniform_continuous.comp H (to_completion.uniform_continuous β)
 
 lemma unique {f' : completion α → completion β} :
-  uniform_continuous f' → (to_completion β) ∘ f = f' ∘ to_completion α → f' = completion_lift H :=
+  uniform_continuous f' → (to_completion β) ∘ f = f' ∘ to_completion α → f' = completion_lift f :=
 completion_extension.unique $ uniform_continuous.comp H (to_completion.uniform_continuous β)
 
-lemma uniform_continuity : uniform_continuous (completion_lift H) :=
+lemma uniform_continuity : uniform_continuous (completion_lift f) :=
 completion_extension.uniform_continuity $ uniform_continuous.comp H (to_completion.uniform_continuous β)
 
-lemma comp : completion_lift (uniform_continuous.comp H H') = (completion_lift H') ∘ completion_lift H :=
+include H H'
+lemma comp : completion_lift (g ∘ f) = (completion_lift g) ∘ completion_lift f :=
 begin
-  let l  := completion_lift H,
-  let l' := completion_lift H',
+  let l  := completion_lift f,
+  let l' := completion_lift g,
+  have : uniform_continuous (g ∘ f) := uniform_continuous.comp H H',
   have : uniform_continuous (l' ∘ l ):= 
     uniform_continuous.comp (uniform_continuity H) (uniform_continuity H'),
   have : (to_completion γ ∘ g) ∘ f = (l' ∘ l) ∘ to_completion α := calc
@@ -207,6 +207,6 @@ begin
     ... = l' ∘ (to_completion β ∘ f) : rfl
     ... = l' ∘ (l  ∘ to_completion α) : by rw completion_lift.lifts H,
   apply eq.symm,
-  apply unique; assumption  
+  apply unique ; assumption
 end
 end completion_lift

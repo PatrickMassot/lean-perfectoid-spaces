@@ -4,6 +4,7 @@
 -/
 
 import analysis.topology.topological_space
+import for_mathlib.completion
 
 open set
 lemma nonempty_iff_univ {α : Type*} : nonempty α ↔ (univ : set α) ≠ ∅ :=
@@ -43,3 +44,15 @@ begin
     simpa [h] using subset_closure H },
   { exact (eq.symm h) ▸ closure_empty },
 end
+
+section uniform_space
+open uniform_space
+variables {α : Type*} [uniform_space α]
+local attribute [instance] separation_setoid
+
+instance inhabited_separation_space [h : inhabited α] : 
+  inhabited (quotient (separation_setoid α)) := ⟨⟦h.default⟧⟩
+
+instance inhabited_completion [inhabited α] : inhabited (completion α) := 
+by unfold completion; apply_instance
+end uniform_space
