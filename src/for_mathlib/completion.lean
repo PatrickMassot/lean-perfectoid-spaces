@@ -60,11 +60,14 @@ instance : complete_space (completion α) := complete_space_separation
 
 instance : separated (completion α) := separated_separation
 
+/-- The following instances are no longer useful here, but could go to mathlib anyway.
+
 instance inhabited_separation_space [h : inhabited α] : 
   inhabited (quotient (separation_setoid α)) := ⟨⟦h.default⟧⟩
 
 instance inhabited_completion [inhabited α] : inhabited (completion α) := 
 by unfold completion; apply_instance
+
 
 /-- Canonical map. Not always injective. -/
 def to_completion : α → completion α := quotient.mk ∘ pure_cauchy
@@ -84,7 +87,7 @@ end
 end to_completion
 
 variable {α}
-variables [complete_space β] [separated β] [inhabited β]
+variables [complete_space β] [separated β]
 
 open set
 
@@ -93,7 +96,7 @@ theorem completion_ump {f : α → β} (H : uniform_continuous f) :
 ∃! g : completion α → β, (uniform_continuous g) ∧ f = g ∘ (to_completion α) :=
 begin
   let de := uniform_embedding_pure_cauchy.dense_embedding pure_cauchy_dense,
-  let g₀ := de.ext f,
+  let g₀ := de.extend f,
   have g₀_unif : uniform_continuous g₀ := 
     uniform_continuous_uniformly_extend uniform_embedding_pure_cauchy pure_cauchy_dense H,
   have compat : ∀ p q : Cauchy α, p ≈ q → g₀ p = g₀ q :=
@@ -106,7 +109,7 @@ begin
       exact filter.image_mem_map (g₀_unif r_in) },
   have g_factor : f = g ∘ (to_completion α),
   { ext x,
-      exact eq.symm (de.ext_e_eq (H.continuous.tendsto x)) },
+      exact eq.symm (de.extend_e_eq (H.continuous.tendsto x)) },
   existsi g,
   split,
   { exact ⟨g_unif, g_factor⟩ },
@@ -121,7 +124,7 @@ end
 noncomputable def completion_extension {f : α → β} (H : uniform_continuous f) : completion α → β :=
 classical.some (completion_ump H)
 
-variables {γ : Type*} [uniform_space γ] [inhabited γ]
+variables {γ : Type*} [uniform_space γ]
 
 /-- Completion functor acting on morphisms -/
 noncomputable def completion_lift {f : α → γ} (H : uniform_continuous f) : completion α → completion γ :=
@@ -133,7 +136,7 @@ namespace completion_extension
 open uniform_space
 variables {α : Type*} [uniform_space α]
 variables {β : Type*} [uniform_space β]
-variables [complete_space β] [separated β] [inhabited β]
+variables [complete_space β] [separated β]
 
 variables {f : α → β} (H : uniform_continuous f)
 
@@ -150,9 +153,9 @@ end completion_extension
 
 namespace completion_lift
 open uniform_space
-variables {α : Type*} [uniform_space α] [inhabited α]
-variables {β : Type*} [uniform_space β] [inhabited β]
-variables {γ : Type*} [uniform_space γ] [inhabited γ]
+variables {α : Type*} [uniform_space α]
+variables {β : Type*} [uniform_space β]
+variables {γ : Type*} [uniform_space γ]
 
 variables {f : α → β} (H : uniform_continuous f)
 variables {g : β → γ} (H' : uniform_continuous g)
