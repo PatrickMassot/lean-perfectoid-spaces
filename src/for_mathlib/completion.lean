@@ -33,6 +33,16 @@ import data.set.function
 import for_mathlib.quotient
 import for_mathlib.continuity
 
+lemma closure_empty_iff {α : Type*} [topological_space α] (s : set α) :
+closure s = ∅ ↔ s = ∅ :=
+begin
+  split ; intro h,
+  { rw set.eq_empty_iff_forall_not_mem,
+    intros x H,
+    simpa [h] using subset_closure H },
+  { exact (eq.symm h) ▸ closure_empty },
+end
+
 local attribute [instance] separation_setoid
 
 open Cauchy
@@ -76,7 +86,8 @@ namespace to_completion
 open set
 
 lemma uniform_continuous : uniform_continuous (to_completion α) :=
-uniform_continuous.comp uniform_embedding_pure_cauchy.uniform_continuous uniform_continuous_quotient_mk
+uniform_continuous.comp uniform_embedding_pure_cauchy.uniform_continuous 
+  uniform_continuous_quotient_mk
 
 lemma dense : closure (range (to_completion α)) = univ   :=
 begin
@@ -90,6 +101,37 @@ variable {α}
 variables [complete_space β] [separated β]
 
 open set
+lemma nonempty_iff_univ {α : Type*} : nonempty α ↔ (univ : set α) ≠ ∅ :=
+sorry
+
+lemma nonempty_of_nonempty_range {α : Type*} {β : Type*} {f : α → β} (H : ¬range f = ∅) : nonempty α :=
+sorry
+
+lemma nonempty_completion_iff : nonempty (completion α) ↔ nonempty α :=
+begin
+  split,
+  { intro h,
+    have := nonempty_iff_univ.1 h,
+    rw ←(to_completion.dense α) at this,
+    have := mt (closure_empty_iff (range (to_completion α))).2 this,
+    exact nonempty_of_nonempty_range this },
+  { intro h,
+    exact ⟨to_completion α (classical.inhabited_of_nonempty h).default⟩ }
+end
+
+
+noncomputable
+def completion_lift' (f : α → β) [decidable (uniform_continuous f)] : completion α → β :=
+if H : uniform_continuous f then 
+  let g₀ := (uniform_embedding_pure_cauchy.dense_embedding pure_cauchy_dense).extend f in
+  have g₀_unif : uniform_continuous g₀ := 
+    uniform_continuous_uniformly_extend uniform_embedding_pure_cauchy pure_cauchy_dense H,
+  have compat : ∀ p q : Cauchy α, p ≈ q → g₀ p = g₀ q :=
+    assume p q h, eq_of_separated_of_uniform_continuous g₀_unif h,
+  quotient.lift g₀ compat
+else
+  λ x, f (classical.inhabited_of_nonempty $ nonempty_completion_iff.1 ⟨x⟩).default
+
 
 /-- Universal mapping property of Hausdorff completion -/
 theorem completion_ump {f : α → β} (H : uniform_continuous f) :
