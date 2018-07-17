@@ -33,15 +33,7 @@ import data.set.function
 import for_mathlib.quotient
 import for_mathlib.continuity
 
-lemma closure_empty_iff {α : Type*} [topological_space α] (s : set α) :
-closure s = ∅ ↔ s = ∅ :=
-begin
-  split ; intro h,
-  { rw set.eq_empty_iff_forall_not_mem,
-    intros x H,
-    simpa [h] using subset_closure H },
-  { exact (eq.symm h) ▸ closure_empty },
-end
+local attribute [instance] classical.prop_decidable
 
 local attribute [instance] separation_setoid
 
@@ -101,27 +93,20 @@ variable {α}
 variables [complete_space β] [separated β]
 
 open set
-lemma nonempty_iff_univ {α : Type*} : nonempty α ↔ (univ : set α) ≠ ∅ :=
-sorry
-
-lemma nonempty_of_nonempty_range {α : Type*} {β : Type*} {f : α → β} (H : ¬range f = ∅) : nonempty α :=
-sorry
 
 lemma nonempty_completion_iff : nonempty (completion α) ↔ nonempty α :=
 begin
-  split,
-  { intro h,
-    have := nonempty_iff_univ.1 h,
-    rw ←(to_completion.dense α) at this,
-    have := mt (closure_empty_iff (range (to_completion α))).2 this,
-    exact nonempty_of_nonempty_range this },
-  { intro h,
-    exact ⟨to_completion α (classical.inhabited_of_nonempty h).default⟩ }
+  split ; rintro ⟨c⟩,
+  { have := eq_univ_iff_forall.1 (to_completion.dense α) c,
+    have := mem_closure_iff.1 this _ is_open_univ trivial,
+    rcases exists_mem_of_ne_empty this with ⟨_, ⟨_, a, _⟩⟩,
+    exact ⟨a⟩ },
+  { exact ⟨to_completion α c⟩ }
 end
 
 
 noncomputable
-def completion_lift' (f : α → β) [decidable (uniform_continuous f)] : completion α → β :=
+def completion_lift' (f : α → β) : completion α → β :=
 if H : uniform_continuous f then 
   let g₀ := (uniform_embedding_pure_cauchy.dense_embedding pure_cauchy_dense).extend f in
   have g₀_unif : uniform_continuous g₀ := 
@@ -131,7 +116,6 @@ if H : uniform_continuous f then
   quotient.lift g₀ compat
 else
   λ x, f (classical.inhabited_of_nonempty $ nonempty_completion_iff.1 ⟨x⟩).default
-
 
 /-- Universal mapping property of Hausdorff completion -/
 theorem completion_ump {f : α → β} (H : uniform_continuous f) :
