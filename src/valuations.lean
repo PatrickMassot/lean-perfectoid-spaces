@@ -1,14 +1,101 @@
+/- quotes from mathlib (mostly Mario) (all 2018)
+
+Jul03
+
+class is_valuation {α : Type} [linear_ordered_comm_group α]
+  {R : Type} [comm_ring R] (f : R → option α) : Prop :=
+(map_zero : f 0 = 0)
+(map_one  : f 1 = 1)
+(map_mul  : ∀ x y, f (x * y) = f x * f y)
+(map_add  : ∀ x y, f (x + y) ≤ f x ∨ f (x + y) ≤ f y)
+
+namespace is_valuation 
+
+...
+
+structure valuation (R : Type) [comm_ring R] (α : Type) [Hα : linear_ordered_comm_group α] :=
+(f : R → option α)
+(Hf : is_valuation f)
+
+...
+
+**All Jul03**
+
+MC: What's wrong, again, with defining Spv as the collection of all valuation relations?
+KB: All proofs need an actual valuation
+MC: You can define your own version of quot.lift and quot.mk that take valuations
+MC: valuation functions that is
+[quot.lift is the statement that if I have a function on valuations which is constant
+on equiv classes then I can produce a function on Spv]
+MC: You only use the relations as inhabitants of the type so that the universe isn't pushed up,
+    but all the work uses functions
+MC: You will need to prove the computation rule, so it won't be definitional, but otherwise it
+    should work smoothly if your API is solid
+MC: No equivalence class needed either
+MC: quot.mk takes a valuation function and produces an element of Spv
+MC: quot.lift takes a function defined on valuation functions and produces a function defined on Spv
+KB: So what about proofs which go "Spv(R) is compact. Proof: take an element of Spv(R), call it v or
+    f or whatever, and now manipulate f in the following way..."
+MC: That's quot.lift
+MC: Actually you will want quot.ind as well
+["any subset of the quotient type containing the image of quot.mk is everything"]
+or equivalently quot.exists_rep
+[lemma exists_rep {α : Sort u} {r : α → α → Prop} (q : quot r) : ∃ a : α, (quot.mk r a) = q :=
+]
+MC: that is, for every element of Spv there is a valuation function that quot.mk's to it
+MC: Note it's not actually a function producing valuation functions, it's an exists
+MC: if you prove analogues of those theorems for your type, then you have constructed the
+    quotient up to isomorphism
+MC: This all has a category theoretic interpretation as a coequalizer, and all constructions
+    are natural in that category
+MC: As opposed to, say, quot.out, which picks an element from an equivalence class
+MC: Although in your case if I understand correctly you also have a canonical way to define quot.out
+    satisfying some other universal property to do with the ordered group
+
+where the valuation and ring have to share the same universe
+9:37 AM
+
+You can prove that the universe need not be the same as part of the universal properties
+9:38 AM
+
+i.e. Spv.mk takes as input a valuation function  (v : valuation R A) where {R : Type u} and {A : Type v} (so it isn't just instantiating the exists)
+9:41 AM
+
+"If you want to be polymorphic" -- I just want to do maths. I have no idea if I want to be polymorphic. If I just want to define a perfectoid space, do I want to be polymorphic?
+9:46 AM
+
+In lean, you should usually be polymorphic
+9:47 AM
+
+at least in contravariant positions (i.e. the inputs should be maximally polymorphic, the output should be minimally polymorphic)
+9:47 AM
+
+This is why we don't have nat : Type u
+10:41 AM
+
+11:51 AM
+
+The general rule is to keep types out of classes if at all possible. Lean behaves better when the types are given as "alpha" rather than "the type inside v", particularly if you start manipulating the functions (adding them, say)
+
+    it is the same things that make the difference between bundled vs unbundled groups. When working "internally", i.e. calculations using the monoid structure, it is better for the type to be exposed as a variable
+
+
+-/
+
+
 import algebra.group_power
 import set_theory.cardinal
 import ring_theory.ideals
 import for_mathlib.subrel 
 import for_mathlib.ideals 
+-- import for_mathlib.quotient_ring -- might be best to use what Chris did!
+import group_theory.subgroup
 
-class linear_ordered_comm_monoid (α : Type)
+class linear_ordered_comm_monoid (α : Type*)
     extends comm_monoid α, linear_order α :=
 (mul_le_mul_left : ∀ {a b : α}, a ≤ b → ∀ c : α, c * a ≤ c * b)
 
-class linear_ordered_comm_group (α : Type)
+class linear_ordered_comm_group (α : Type*)
     extends comm_group α, linear_order α :=
 (mul_le_mul_left : ∀ {a b : α}, a ≤ b → ∀ c : α, c * a ≤ c * b)
 
@@ -16,8 +103,8 @@ local infix ^ := monoid.pow
 
 namespace linear_ordered_comm_group
 
-variables {α : Type} [linear_ordered_comm_group α] {x y z : α}
-variables {β : Type} [linear_ordered_comm_group β]
+variables {α : Type*} [linear_ordered_comm_group α] {x y z : α}
+variables {β : Type*} [linear_ordered_comm_group β]
 
 class is_hom (f : α → β) : Prop :=
 (Hf : is_group_hom f)
@@ -230,40 +317,63 @@ end extend
 
 end linear_ordered_comm_group
 
-class is_valuation {α : Type} [linear_ordered_comm_group α]
-  {R : Type} [comm_ring R] (f : R → option α) : Prop :=
+structure valuation (R : Type*) [comm_ring R] (Γ : Type*) [linear_ordered_comm_group Γ] :=
+(f : R → option Γ)
 (map_zero : f 0 = 0)
 (map_one  : f 1 = 1)
 (map_mul  : ∀ x y, f (x * y) = f x * f y)
 (map_add  : ∀ x y, f (x + y) ≤ f x ∨ f (x + y) ≤ f y)
 
-namespace is_valuation
+instance (R : Type*) [comm_ring R] (Γ : Type*) [HΓ : linear_ordered_comm_group Γ] :
+has_coe_to_fun (valuation R Γ) := { F := λ _,R → option Γ, coe := λ v,v.f}
 
-variables {α : Type} [linear_ordered_comm_group α]
-variables {R : Type} [comm_ring R] (f : R → option α)
-variables [is_valuation f] {x y z : R}
+-- do I need this now?
 
-theorem map_unit : x * y = 1 → option.is_some (f x) :=
+class is_valuation {α : Type*} [linear_ordered_comm_group α]
+  {R : Type*} [comm_ring R] (f : R → option α) : Prop :=
+(map_zero : f 0 = 0)
+(map_one  : f 1 = 1)
+(map_mul  : ∀ x y, f (x * y) = f x * f y)
+(map_add  : ∀ x y, f (x + y) ≤ f x ∨ f (x + y) ≤ f y)
+
+instance valuation.is_valuation {R : Type*} [comm_ring R] {Γ : Type*} [linear_ordered_comm_group Γ]
+  (v : valuation R Γ) : is_valuation v := {
+  map_zero := v.map_zero,
+  map_one := v.map_one,
+  map_mul := v.map_mul,
+  map_add := v.map_add  
+  }
+
+namespace valuation
+
+variables {Γ : Type*} [linear_ordered_comm_group Γ]
+variables {R : Type*} [comm_ring R]
+variables (v : valuation R Γ) {x y z : R}
+
+theorem map_unit : x * y = 1 → option.is_some (v x) :=
 begin
   intro h,
-  have h1 := map_mul f x y,
-  rw [h, map_one f] at h1,
-  cases (f x),
+  have h1 := map_mul v x y,
+  rw [h, map_one v] at h1,
+  show ↥(option.is_some (v.f x)),
+  cases (v.f x),
   { exfalso,
     exact option.no_confusion h1 },
   { constructor }
 end
 
-theorem map_neg_one : f (-1) = 1 :=
+theorem map_neg_one : v (-1) = 1 :=
 begin
   have h1 : (-1 : R) * (-1) = 1 := by simp,
-  have h2 := map_unit f h1,
-  have h3 := map_mul f (-1) (-1),
+  have h2 := map_unit v h1,
+  have h3 := map_mul v (-1) (-1),
   rw [option.is_some_iff_exists] at h2,
   cases h2 with x h,
+  change v.f (-1) = some x at h,
+  show v.f (-1) = 1,
   rw h at h3 ⊢,
   congr,
-  rw [h1, map_one f] at h3,
+  rw [h1, map_one v] at h3,
   replace h3 := eq.symm (option.some.inj h3),
   have h4 : x^2 = 1 := by simpa [monoid.pow] using h3,
   exact linear_ordered_comm_group.eq_one_of_pow_eq_one h4
@@ -273,7 +383,7 @@ namespace trivial
 
 variables (S : set R) [is_prime_ideal S] [decidable_pred S]
 
-instance : is_valuation (λ x, if x ∈ S then (0 : option α) else 1) :=
+instance : is_valuation (λ x, if x ∈ S then (0 : option Γ) else 1) :=
 { map_zero := if_pos (is_submodule.zero_ R S),
   map_one  := if_neg is_proper_ideal.one_not_mem,
   map_mul  := λ x y, begin
@@ -306,49 +416,62 @@ instance : is_valuation (λ x, if x ∈ S then (0 : option α) else 1) :=
 
 end trivial
 
-def supp : set R := {x | f x = 0}
+def supp : set R := {x | v x = 0}
 
-instance : is_prime_ideal (supp f) :=
-{ zero_ := map_zero f,
-  add_  := λ x y hx hy, or.cases_on (map_add f x y)
+instance : is_prime_ideal (supp v) :=
+{ zero_ := map_zero v,
+  add_  := λ x y hx hy, or.cases_on (map_add v x y)
     (λ hxy, le_antisymm (hx ▸ hxy) trivial)
     (λ hxy, le_antisymm (hy ▸ hxy) trivial),
-  smul  := λ c x hx, calc f (c * x)
-                        = f c * f x : map_mul f c x
-                    ... = f c * 0 : congr_arg _ hx
+  smul  := λ c x hx, calc v (c * x)
+                        = v c * v x : map_mul v c x
+                    ... = v c * 0 : congr_arg _ hx
                     ... = 0 : linear_ordered_comm_group.extend.mul_zero _,
-  ne_univ := λ h, have h1 : (1:R) ∈ supp f, by rw h; trivial,
-    have h2 : f 1 = 0 := h1,
-    by rw [map_one f] at h2; exact option.no_confusion h2,
+  ne_univ := λ h, have h1 : (1:R) ∈ supp v, by rw h; trivial,
+    have h2 : v.f 1 = 0 := h1,
+    by rw [map_one v] at h2; exact option.no_confusion h2,
   mem_or_mem_of_mul_mem := λ x y hxy, begin
       dsimp [supp] at hxy ⊢,
-      rw [map_mul f x y] at hxy,
+      change v.f (x * y) = 0 at hxy,
+      rw [map_mul v x y] at hxy,
       exact linear_ordered_comm_group.extend.eq_zero_or_eq_zero_of_mul_eq_zero _ _ hxy
     end }
 
-end is_valuation
+/-
+definition extension_to_integral_domain {α : Type} [linear_ordered_comm_group α]
+  {R : Type} [comm_ring R] (f : R → option α) [H : is_valuation f] :
+  (comm_ring.quotient R (supp f)) → option α := sorry
+-/
 
-structure valuations (R : Type) [comm_ring R] :=
-{α : Type}
-[Hα : linear_ordered_comm_group α]
-(f : R → option α)
-(Hf : is_valuation f)
+definition value_group {R : Type} [comm_ring R] {Γ : Type*} [linear_ordered_comm_group Γ]
+  (v : valuation R Γ) := 
+group.closure {a : Γ | ∃ r : R, v r = some a}
 
-attribute [instance] valuations.Hα
+instance {R : Type*} [comm_ring R] {Γ : Type*} [linear_ordered_comm_group Γ]
+   (v : valuation R Γ) : group (value_group v) :=
+  @subtype.group _ _ (value_group v) (group.closure.is_subgroup {a : Γ | ∃ r : R, v r = some a})
 
---instance (R : Type) [comm_ring R] : has_coe_to_fun (valuations R) :=
---{ F := λ v,R → option v.α, 
---  coe := λ v,v.f
---}
+
 
 /- Wedhorn 1.27 (ii) -/
-instance valuations.setoid (R : Type) [comm_ring R] : setoid (valuations R) :=
-{ r := λ v w, ∀ r s : R, v.f r ≤ v.f s ↔ w.f r ≤ w.f s,
-  iseqv := ⟨
-    -- reflexivity 
-    λ _ _ _,iff.rfl,
-    -- symmetry
-    λ v w H r s,(H r s).symm,
-    -- transitivity
-    λ v w x Hvw Hwx r s,iff.trans (Hvw r s) (Hwx r s)⟩
-} 
+
+/-
+theorem equiv_value_group_map (R : Type) [comm_ring R] (v w : valuations R) (H : v ≈ w) :
+∃ φ : value_group v.f → value_group w.f, is_group_hom φ ∧ function.bijective φ :=
+begin
+  existsi _,tactic.swap,
+  { intro g,
+    cases g with g Hg,
+    unfold value_group at Hg,
+    unfold group.closure at Hg,
+    dsimp at Hg,
+    induction Hg,
+  },
+  {sorry 
+
+  }
+end 
+-/
+
+end valuation
+
