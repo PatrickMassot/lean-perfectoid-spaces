@@ -35,6 +35,65 @@ import for_mathlib.continuity
 
 local attribute [instance] classical.prop_decidable
 
+namespace uniform_space
+universes u
+variables (α : Type u) [uniform_space α]
+
+structure completion_pkg := 
+(space : Type u)
+(uniform_structure : uniform_space space)
+(completeness : complete_space space)
+(separation : separated space)
+(map : α → space)
+(uniform_continuity : uniform_continuous map)
+(lift : ∀ {β : Type u} (f : α → β), space → β)
+(lift_uc : ∀ {β : Type u} [uniform_space β] [complete_space β] [separated β] {f : α → β},
+           uniform_continuous f → uniform_continuous (lift f))
+(lift_lifts : ∀ {β : Type u} [uniform_space β] [complete_space β] [separated β] {f : α → β},
+           uniform_continuous f → f = (lift f) ∘ map)
+(lift_unique : ∀ {β : Type u} [uniform_space β] [complete_space β] [separated β] 
+           {f : α → β} (h : uniform_continuous f) {g : space → β}, 
+           uniform_continuous g → f = g ∘ map → g = lift f)
+
+attribute [instance]
+  completion_pkg.uniform_structure
+  completion_pkg.completeness
+  completion_pkg.separation
+
+namespace completion_pkg
+variables (pkg pkg' : completion_pkg α) {α}
+
+def compare (pkg pkg' : completion_pkg α) : pkg.space → pkg'.space := 
+pkg.lift pkg'.map
+
+lemma uniform_continuous_compare : uniform_continuous (compare pkg pkg') :=
+pkg.lift_uc pkg'.uniform_continuity
+
+lemma lifts_compare : pkg'.map = (compare pkg pkg') ∘ pkg.map :=
+pkg.lift_lifts pkg'.uniform_continuity
+
+lemma compare_iso_aux : (compare pkg' pkg) ∘ (compare pkg pkg') = id :=
+begin
+  let c  := compare pkg' pkg,
+  let c_uc := uniform_continuous_compare pkg' pkg,
+  have c_lifts : pkg.map = c ∘ pkg'.map := lifts_compare pkg' pkg,
+  
+  let c' := compare pkg pkg',
+  let c'_uc := uniform_continuous_compare pkg pkg',
+  have c'_lifts : pkg'.map = c' ∘ pkg.map := lifts_compare pkg pkg',
+
+  have id_lifts : id = pkg.lift (pkg.map) := 
+    pkg.lift_unique pkg.uniform_continuity uniform_continuous_id (by simp),
+  rw id_lifts,
+
+  apply pkg.lift_unique pkg.uniform_continuity (uniform_continuous.comp c'_uc c_uc),
+  change pkg.map = c ∘ c' ∘ pkg.map,
+  cc
+end
+
+end completion_pkg
+end uniform_space
+
 local attribute [instance] separation_setoid
 
 open Cauchy
