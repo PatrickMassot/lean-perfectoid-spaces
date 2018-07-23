@@ -33,6 +33,29 @@ import data.set.function
 import for_mathlib.quotient
 import for_mathlib.continuity
 
+namespace uniform_space
+variables {α : Type*} [uniform_space α] {β : Type*} [uniform_space β] {γ : Type*} [uniform_space γ]
+
+lemma uniform_continuous.prod.partial1 {f : α × β → γ} (h : uniform_continuous f) :
+∀ b, uniform_continuous (λ a, f (a,b)) := λ b, uniform_continuous.comp 
+      (uniform_continuous.prod_mk uniform_continuous_id uniform_continuous_const) h
+
+lemma uniform_continuous.prod.partial2 {f : α × β → γ} (h : uniform_continuous f) :
+∀ a, uniform_continuous (λ b, f (a,b)) := λ a, uniform_continuous.comp 
+      (uniform_continuous.prod_mk uniform_continuous_const uniform_continuous_id) h
+
+instance complete_space.prod [complete_space α] [complete_space β] : complete_space (α × β) :=
+{ complete := λ f hf,
+    let ⟨x1, hx1⟩ := complete_space.complete $ cauchy_map uniform_continuous_fst hf in
+    let ⟨x2, hx2⟩ := complete_space.complete $ cauchy_map uniform_continuous_snd hf in
+    ⟨(x1, x2), by rw [nhds_prod_eq, filter.prod_def];
+      from filter.le_lift (λ s hs, filter.le_lift' $ λ t ht,
+        have H1 : prod.fst ⁻¹' s ∈ f.sets := hx1 hs,
+        have H2 : prod.snd ⁻¹' t ∈ f.sets := hx2 ht,
+        filter.inter_mem_sets H1 H2)⟩ }
+
+end uniform_space
+
 local attribute [instance] classical.prop_decidable
 
 namespace uniform_space
@@ -46,7 +69,7 @@ structure completion_pkg :=
 (separation : separated space)
 (map : α → space)
 (uniform_continuity : uniform_continuous map)
-(lift : ∀ {β : Type u} (f : α → β), space → β)
+(lift : Π {β : Type u} [uniform_space β] [complete_space β] [separated β] (f : α → β), space → β)
 (lift_uc : ∀ {β : Type u} [uniform_space β] [complete_space β] [separated β] {f : α → β},
            uniform_continuous f → uniform_continuous (lift f))
 (lift_lifts : ∀ {β : Type u} [uniform_space β] [complete_space β] [separated β] {f : α → β},
@@ -110,6 +133,12 @@ assume _ h', h _ (H h')
 lemma eq_of_separated_of_uniform_continuous [separated β] {f : α → β} (H : uniform_continuous f) {x y : α} 
 (h : x ≈ y) : f x = f y :=
 separated_def.1 (by apply_instance) _ _ $ separated_of_uniform_continuous H h
+
+instance separated.prod [separated α] [separated β] : separated (α × β) := 
+separated_def.2 $ assume x y H, prod.ext 
+  (eq_of_separated_of_uniform_continuous uniform_continuous_fst H)
+  (eq_of_separated_of_uniform_continuous uniform_continuous_snd H)
+
 
 variable (α)
 
@@ -197,6 +226,9 @@ begin
   refl
 end
 
+@[simp]
+lemma lifts' : ∀ a : α, f a = (completion_extension f) a := λ a, congr_fun (lifts H) a
+
 lemma uniform_continuity : uniform_continuous (completion_extension f) :=
 begin
   unfold completion_extension,
@@ -227,6 +259,93 @@ begin
   apply is_closed_property (to_completion.dense α) closed_eq eq_on_α x,
 end
 end completion_extension
+
+namespace completion
+variables (α : Type*) [uniform_space α] (β : Type*) [uniform_space β]
+open uniform_space
+
+noncomputable def std_pkg : completion_pkg α :=
+{ space := completion α,
+  uniform_structure := by apply_instance,
+  completeness := by apply_instance,
+  separation := by apply_instance,
+  map := to_completion _,
+  uniform_continuity := to_completion.uniform_continuous _,
+  lift := @completion_extension _ _,
+  lift_uc := @completion_extension.uniform_continuity _ _,
+  lift_lifts := @completion_extension.lifts _ _,
+  lift_unique := @completion_extension.unique _ _ }
+
+variables {γ : Type*} [uniform_space γ] [complete_space γ] [separated γ]
+variables {α β}
+
+noncomputable
+def aux (f : α × β → γ) : β → completion α → γ :=
+λ b, completion_extension (λ a, f (a, b))
+
+noncomputable
+def aux' (f' : β → completion α → γ) (x : completion α) : completion β → γ :=
+completion_extension (λ b, f' b x)
+
+lemma t  (f : α × β → γ) (h : uniform_continuous f) (x : completion α) : uniform_continuous (λ b, aux f b x) :=
+begin
+  have : ∀ b, uniform_continuous (λ a, f (a, b)) :=
+    λ b, uniform_continuous.comp 
+      (uniform_continuous.prod_mk uniform_continuous_id uniform_continuous_const) h,
+  have : ∀ b, uniform_continuous (completion_extension (λ a, f (a, b))) :=
+    λ b, completion_extension.uniform_continuity (this b),
+  unfold aux,
+  sorry
+end
+
+/-
+noncomputable
+def prod_lift (f : α × β → γ) : (completion α) × (completion β) → γ := 
+λ x, aux' (aux f) x.1 x.2
+-/
+noncomputable
+def prod_lift (f : α × β → γ) : (completion α) × (completion β) → γ := 
+λ p, completion_extension (λ b, completion_extension (λ a, f (a, b)) p.1) p.2
+
+
+
+#check completion_extension.lifts'
+noncomputable def prod_pkg : completion_pkg (α × β) :=
+begin
+  refine { 
+    space := completion α × completion β,
+    uniform_structure := by apply_instance,
+    completeness := by apply_instance,
+    separation := by apply_instance,
+    map := λ x, (x.1, x.2),
+    uniform_continuity := uniform_continuous.prod_mk 
+      (uniform_continuous.comp uniform_continuous_fst $ to_completion.uniform_continuous _) 
+      (uniform_continuous.comp uniform_continuous_snd $ to_completion.uniform_continuous _),
+    lift := @prod_lift _ _ _ _, .. } ;
+  intros γ γ_us γ_cs γ_sep f f_uc ; letI := γ_us ; letI := γ_cs ; letI := γ_sep ;
+  have uc1 := uniform_continuous.prod.partial1 f_uc ;
+  have uc2 := uniform_continuous.prod.partial2 f_uc,
+  { --apply uniform_continuous.prod_mk,
+    sorry },
+  { ext x,
+    dsimp[prod_lift],
+    
+    have e1 := λ b : β, eq.symm (completion_extension.lifts' (uc1 b) x.1),
+    have e2 := λ a : α, eq.symm (completion_extension.lifts' (uc2 a) x.2),
+    simp[e1,e2] },
+  { intros g g_uc g_extends,
+    ext x,
+    let φ := λ y, g (x.1, y),
+    have φ_uc : uniform_continuous φ := uniform_continuous.prod.partial2 g_uc x.1, 
+    have e1 := λ b : β, completion_extension.unique (uc1 b),
+    
+    
+    sorry },
+end
+
+
+end completion
+
 
 namespace completion.map
 open uniform_space
