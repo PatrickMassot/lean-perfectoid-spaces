@@ -3,25 +3,25 @@ Copyright (c) 2018 Patrick Massot. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Patrick Massot
 
-Hausdorff completions of topological spaces.
+Hausdorff completions of uniform spaces.
 
 The goal is to construct a left-adjoint to the inclusion of complete Hausdorff uniform spaces
 into all uniform spaces. Any uniform space `α` gets a completion `completion α` and a morphism
 (ie. uniformly continuous map) `to_completion : α → completion α` which solves the universal 
 mapping problem of factorizing morphisms from `α` to any complete Hausdorff uniform space `β`. 
 It means any uniformly continuous `f : α → β` gives rise to a unique morphism 
-`g : completion α → β` such that `f = g ∘ to_completion α`. This morphism
-is `completion_lift H` where `H : uniform_continuous f` (`f` itself is an implicit argument to
-`completion_lift`). 
+`completion.map f : completion α → β` such that `f = completion_extension f ∘ to_completion α`.
+Actually `completion_extension f` is defined for all maps from `α` to `β` but it has the desired 
+properties only if `f` is uniformly continuous.
 
 Beware that `to_completion α` is not injective if `α` is not Hausdorff. But its image is always 
 dense.
 
 The adjoint functor acting on morphisms is then constructed by the usual abstract nonsense.
-For every uniform spaces `α` and `β`, if turns `f : α → β`, `H : uniform_continuous f` into
-a morphism `completion_lift H : completion α → completion β` such that 
-`(to_completion β) ∘ f = (completion_lift H) ∘ to_completion α`. This construction is
-compatible with composition.
+For every uniform spaces `α` and `β`, if turns `f : α → β` into
+a morphism `completion.map f : completion α → completion β` such that 
+`(to_completion β) ∘ f = (completion.map f) ∘ to_completion α` provided `f` is uniformly continuous.
+This construction is compatible with composition.
 
 This formalization is mostly based on N. Bourbaki: /General Topology/ but from a slightly 
 different perspective in order to reuse material in analysis.topology.uniform_space.
@@ -34,6 +34,65 @@ import for_mathlib.quotient
 import for_mathlib.continuity
 
 local attribute [instance] classical.prop_decidable
+
+namespace uniform_space
+universes u
+variables (α : Type u) [uniform_space α]
+
+structure completion_pkg := 
+(space : Type u)
+(uniform_structure : uniform_space space)
+(completeness : complete_space space)
+(separation : separated space)
+(map : α → space)
+(uniform_continuity : uniform_continuous map)
+(lift : ∀ {β : Type u} (f : α → β), space → β)
+(lift_uc : ∀ {β : Type u} [uniform_space β] [complete_space β] [separated β] {f : α → β},
+           uniform_continuous f → uniform_continuous (lift f))
+(lift_lifts : ∀ {β : Type u} [uniform_space β] [complete_space β] [separated β] {f : α → β},
+           uniform_continuous f → f = (lift f) ∘ map)
+(lift_unique : ∀ {β : Type u} [uniform_space β] [complete_space β] [separated β] 
+           {f : α → β} (h : uniform_continuous f) {g : space → β}, 
+           uniform_continuous g → f = g ∘ map → g = lift f)
+
+attribute [instance]
+  completion_pkg.uniform_structure
+  completion_pkg.completeness
+  completion_pkg.separation
+
+namespace completion_pkg
+variables (pkg pkg' : completion_pkg α) {α}
+
+def compare (pkg pkg' : completion_pkg α) : pkg.space → pkg'.space := 
+pkg.lift pkg'.map
+
+lemma uniform_continuous_compare : uniform_continuous (compare pkg pkg') :=
+pkg.lift_uc pkg'.uniform_continuity
+
+lemma lifts_compare : pkg'.map = (compare pkg pkg') ∘ pkg.map :=
+pkg.lift_lifts pkg'.uniform_continuity
+
+lemma compare_iso_aux : (compare pkg' pkg) ∘ (compare pkg pkg') = id :=
+begin
+  let c  := compare pkg' pkg,
+  let c_uc := uniform_continuous_compare pkg' pkg,
+  have c_lifts : pkg.map = c ∘ pkg'.map := lifts_compare pkg' pkg,
+  
+  let c' := compare pkg pkg',
+  let c'_uc := uniform_continuous_compare pkg pkg',
+  have c'_lifts : pkg'.map = c' ∘ pkg.map := lifts_compare pkg pkg',
+
+  have id_lifts : id = pkg.lift (pkg.map) := 
+    pkg.lift_unique pkg.uniform_continuity uniform_continuous_id (by simp),
+  rw id_lifts,
+
+  apply pkg.lift_unique pkg.uniform_continuity (uniform_continuous.comp c'_uc c_uc),
+  change pkg.map = c ∘ c' ∘ pkg.map,
+  cc
+end
+
+end completion_pkg
+end uniform_space
 
 local attribute [instance] separation_setoid
 
@@ -63,17 +122,11 @@ instance : complete_space (completion α) := complete_space_separation
 
 instance : separated (completion α) := separated_separation
 
-/-- The following instances are no longer useful here, but could go to mathlib anyway.
-
-instance inhabited_separation_space [h : inhabited α] : 
-  inhabited (quotient (separation_setoid α)) := ⟨⟦h.default⟧⟩
-
-instance inhabited_completion [inhabited α] : inhabited (completion α) := 
-by unfold completion; apply_instance
-
-
 /-- Canonical map. Not always injective. -/
 def to_completion : α → completion α := quotient.mk ∘ pure_cauchy
+
+/-- Automatic coercion from `α` to its completion -/
+instance : has_coe α (completion α) := ⟨to_completion α⟩
 
 namespace to_completion
 open set
@@ -120,7 +173,7 @@ else
   λ x, f (classical.inhabited_of_nonempty $ nonempty_completion_iff.1 ⟨x⟩).default
 
 /-- Completion functor acting on morphisms -/
-noncomputable def completion_lift (f : α → γ) : completion α → completion γ :=
+noncomputable def completion.map (f : α → γ) : completion α → completion γ :=
 completion_extension ((to_completion γ) ∘ f)
 end uniform_space
 
@@ -165,17 +218,17 @@ lemma unique {h : completion α → β} :
 begin
   let g := completion_extension f,
   have g_unif : uniform_continuous g := uniform_continuity H,
-  have lifsts : f = g ∘ to_completion α := lifts H,
   intros h_unif h_lifts,
   change h = g,
   ext x,
   have closed_eq : is_closed {x | h x = g x} := is_closed_eq h_unif.continuous g_unif.continuous,
+  have : f = g ∘ to_completion α := lifts H,
   have eq_on_α : ∀ x, (h ∘ to_completion α) x = (g ∘ to_completion α) x, by cc,
   apply is_closed_property (to_completion.dense α) closed_eq eq_on_α x,
 end
 end completion_extension
 
-namespace completion_lift
+namespace completion.map
 open uniform_space
 variables {α : Type*} [uniform_space α]
 variables {β : Type*} [uniform_space β]
@@ -184,29 +237,29 @@ variables {γ : Type*} [uniform_space γ]
 variables {f : α → β} (H : uniform_continuous f)
 variables {g : β → γ} (H' : uniform_continuous g)
 
-lemma lifts : (to_completion β) ∘ f = (completion_lift f) ∘ to_completion α :=
+lemma lifts : (to_completion β) ∘ f = (completion.map f) ∘ to_completion α :=
 completion_extension.lifts $ uniform_continuous.comp H (to_completion.uniform_continuous β)
 
 lemma unique {f' : completion α → completion β} :
-  uniform_continuous f' → (to_completion β) ∘ f = f' ∘ to_completion α → f' = completion_lift f :=
+  uniform_continuous f' → (to_completion β) ∘ f = f' ∘ to_completion α → f' = completion.map f :=
 completion_extension.unique $ uniform_continuous.comp H (to_completion.uniform_continuous β)
 
-lemma uniform_continuity : uniform_continuous (completion_lift f) :=
+lemma uniform_continuity : uniform_continuous (completion.map f) :=
 completion_extension.uniform_continuity $ uniform_continuous.comp H (to_completion.uniform_continuous β)
 
 include H H'
-lemma comp : completion_lift (g ∘ f) = (completion_lift g) ∘ completion_lift f :=
+lemma comp : completion.map (g ∘ f) = (completion.map g) ∘ completion.map f :=
 begin
-  let l  := completion_lift f,
-  let l' := completion_lift g,
+  let l  := completion.map f,
+  let l' := completion.map g,
   have : uniform_continuous (g ∘ f) := uniform_continuous.comp H H',
   have : uniform_continuous (l' ∘ l ):= 
     uniform_continuous.comp (uniform_continuity H) (uniform_continuity H'),
   have : (to_completion γ ∘ g) ∘ f = (l' ∘ l) ∘ to_completion α := calc
-    (to_completion γ ∘ g) ∘ f = (l' ∘ to_completion β) ∘ f : by rw completion_lift.lifts H'
+    (to_completion γ ∘ g) ∘ f = (l' ∘ to_completion β) ∘ f : by rw completion.map.lifts H'
     ... = l' ∘ (to_completion β ∘ f) : rfl
-    ... = l' ∘ (l  ∘ to_completion α) : by rw completion_lift.lifts H,
+    ... = l' ∘ (l  ∘ to_completion α) : by rw completion.map.lifts H,
   apply eq.symm,
   apply unique ; assumption
 end
-end completion_lift
+end completion.map
