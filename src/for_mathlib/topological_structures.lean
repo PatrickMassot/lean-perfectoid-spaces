@@ -185,12 +185,75 @@ section topological_add_comm_group_completion
 universe u
 variables (G : Type u) [add_comm_group G] [topological_space G] [topological_add_group G]  
 
-open uniform_space
+open uniform_space function set
 
-instance completion_group_str : add_comm_group (completion G) := sorry
+noncomputable instance : has_add (completion G) := 
+  ⟨curry ((completion.map (function.uncurry ((+) : G → G → G))) ∘ completion.prod_prod)⟩
+
+instance : has_zero (completion G) := ⟨(0:G)⟩
+
+noncomputable instance : has_neg (completion G) := ⟨completion.map (λ x, -x)⟩
+
+variable {G}
+lemma add_add (a b : G) : (a : completion G) + (b : completion G) = (a + b : G) := sorry
+
+lemma completion.neg_neg (a : G) : -(a : completion G) = (-a : G) := sorry
+
+-- We will also need continuity properties for these operations, see the sorries in the group instance
+
+lemma dense₁ : closure (range (λ x : G, (x : completion G))) = univ := 
+to_completion.dense G
+
+lemma dense₂ : let H := completion G in let φ : G × G → H × H := λ x, ⟨x.1, x.2⟩ in 
+  closure (range φ) = univ := 
+sorry
+
+lemma dense₃ : let H := completion G in let φ : G × G × G → H × H × H := λ x, ⟨x.1, x.2.1, x.2.2⟩ in 
+  closure (range φ) = univ := 
+sorry
+
+noncomputable
+instance completion_group_str : add_comm_group (completion G) := 
+begin
+  let H := completion G,
+  refine_struct {
+    add := curry ((completion.map (function.uncurry ((+) : G → G → G))) ∘ completion.prod_prod),
+    zero := (0:G),
+    neg := completion.map (λ x, -x),
+  },
+  { intros a b c,
+    have closed : is_closed {x : H × H × H | x.1 + x.2.1 + x.2.2 = x.1 + (x.2.1 + x.2.2) }, sorry,
+    have := is_closed_property dense₃ closed (by {intro a, repeat { rw add_add }, rw add_assoc }),
+    exact this ⟨a, b, c⟩ },
+  { have closed : is_closed {x : H | 0 + x = x }, 
+    { have : continuous (λ x : H, 0 + x), sorry,
+      exact is_closed_eq this continuous_id },
+    exact is_closed_property dense₁ closed (by {intro x, rw add_add, rw zero_add}) },
+  { have closed : is_closed {x : H | x + (0:G) = x }, 
+    { have : continuous (λ x : H, x + (0:G)), sorry,
+      exact is_closed_eq this continuous_id },
+    exact is_closed_property dense₁ closed (by {intro x, rw add_add, rw add_zero}) },
+  { have closed : is_closed {x : H | -x + x = (0:G)}, 
+    { have : continuous (λ x : H, -x + x), sorry,
+      exact is_closed_eq this continuous_const },
+    have := is_closed_property dense₁ closed (by {intro x, rw completion.neg_neg, rw add_add, rw add_left_neg }),
+    exact this },
+  { intros a b,
+    have closed : is_closed {x : H × H | x.1 + x.2 = x.2 + x.1 }, 
+    { have c₁ : continuous (λ x : H × H, x.1 + x.2), sorry,
+      have c₂ : continuous (λ x : H × H, x.2 + x.1), sorry,
+      exact is_closed_eq c₁ c₂ },
+    have := is_closed_property dense₂ closed (by {intro a, repeat { rw add_add }, rw add_comm }),
+    exact this ⟨a, b⟩ },
+end
 
 class is_add_group_hom {α : Type*} {β : Type*} [add_group α] [add_group β] (f : α → β) : Prop :=
 (mul : ∀ a b : α, f (a + b) = f a + f b)
 
-instance to_completion_mph : is_add_group_hom (to_completion G) := sorry
+instance to_completion_mph : is_add_group_hom (to_completion G) := 
+⟨begin
+  intros a b,
+  change ↑(a + b)= ↑a + ↑b,
+  exact eq.symm (add_add a b)
+end⟩
 end topological_add_comm_group_completion

@@ -239,6 +239,10 @@ instance : complete_space (completion α) := complete_space_separation
 
 instance : separated (completion α) := separated_separation
 
+instance : t2_space (completion α) := separated_t2
+
+instance : regular_space (completion α) := separated_regular
+
 /-- Canonical map. Not always injective. -/
 def to_completion : α → completion α := quotient.mk ∘ pure_cauchy
 
@@ -367,9 +371,6 @@ noncomputable def std_pkg : completion_pkg α :=
 variables {γ : Type*} [uniform_space γ] [complete_space γ] [separated γ]
 variables {α β}
 
-#check (by apply_instance : setoid (α × β))
-#check quotient.induction_on₂
-
 def dense_cauchy := uniform_embedding_pure_cauchy.dense_embedding (@pure_cauchy_dense α _)
 
 lemma dense_prod : dense_embedding (λ p : α × β, (pure_cauchy p.1, pure_cauchy p.2)) :=
@@ -378,19 +379,37 @@ dense_embedding.prod dense_cauchy dense_cauchy
 noncomputable
 def prod_prod : (completion α) × (completion β) → completion (α × β) :=
 begin
-  let g₀ := function.curry (dense_prod.extend (to_completion (α × β))),
+  let g₀ := λ (a : Cauchy α) (b : Cauchy β),  (dense_prod.extend (to_completion (α × β))) (a, b),
   
   refine function.uncurry (quotient.lift₂ g₀ _),
   { intros a₁ b₁ a₂ b₂ eqv₁ eqv₂,
-    let g₁ := dense_prod.extend (to_completion (α × β)),
-    change g₁ (a₁, b₁) = g₁ (a₂, b₂),
-    have g₁_uc : uniform_continuous g₁, 
+    have g₁_uc : uniform_continuous (dense_prod.extend (to_completion (α × β))),
     { let ue : uniform_embedding (λ (p : α × β), (pure_cauchy (p.fst), pure_cauchy (p.snd))) :=
         uniform_embedding.prod uniform_embedding_pure_cauchy uniform_embedding_pure_cauchy,
       refine uniform_continuous_uniformly_extend ue _ (to_completion.uniform_continuous (α × β)) },
     
-    exact eq_of_separated_of_uniform_continuous g₁_uc (separation_prod.2 ⟨eqv₁, eqv₂⟩) },
+    have := eq_of_separated_of_uniform_continuous g₁_uc (separation_prod.2 ⟨eqv₁, eqv₂⟩),
+    exact this },
 end
+
+lemma prod_prod.uc : uniform_continuous (@prod_prod α _ β _) :=
+begin
+  
+  intros r r_in,
+  rw filter.mem_map,
+  --dsimp[completion],
+  --rw uniformity_prod,
+  rw uniformity_prod_eq_prod,
+  rw filter.mem_map,
+  
+  rw filter.mem_prod_iff,
+  change r ∈ (filter.map (λp:((Cauchy (α × β))×(Cauchy (α × β))), (⟦p.1⟧, ⟦p.2⟧)) uniformity).sets at r_in,
+  rw filter.mem_map at r_in,
+  
+  sorry,
+end
+
+lemma prod_prod_lift (a : α) (b : β) : @prod_prod α _ β _ (a, b) = (a, b) := sorry
 
 noncomputable
 def prod_lift (f : α × β → γ) : (completion α) × (completion β) → γ := 
