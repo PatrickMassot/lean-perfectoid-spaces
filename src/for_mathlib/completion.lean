@@ -134,6 +134,23 @@ lemma eq_of_separated_of_uniform_continuous [separated β] {f : α → β} (H : 
 (h : x ≈ y) : f x = f y :=
 separated_def.1 (by apply_instance) _ _ $ separated_of_uniform_continuous H h
 
+lemma separation_prod {a₁ a₂ : α} {b₁ b₂ : β} : (a₁, b₁) ≈ (a₂, b₂) ↔ a₁ ≈ a₂ ∧ b₁ ≈ b₂ :=
+begin
+  split ; intro h,
+  { exact ⟨separated_of_uniform_continuous uniform_continuous_fst h,
+           separated_of_uniform_continuous uniform_continuous_snd h⟩ },
+  { rcases h with ⟨eqv_α, eqv_β⟩,  
+    intros r r_in,
+    rw uniformity_prod at r_in,
+    rcases r_in with ⟨t_α, ⟨r_α, r_α_in, h_α⟩, t_β, ⟨r_β, r_β_in, h_β⟩, H⟩,
+
+    let p_α := λ (p : (α × β) × α × β), ((p.fst).fst, (p.snd).fst),
+    let p_β := λ (p : (α × β) × α × β), ((p.fst).snd, (p.snd).snd),    
+    have key_α : p_α ((a₁, b₁), (a₂, b₂)) ∈ r_α, by simp[p_α, eqv_α r_α r_α_in],
+    have key_β : p_β ((a₁, b₁), (a₂, b₂)) ∈ r_β, by simp[p_β, eqv_β r_β r_β_in],
+    exact H ⟨h_α key_α, h_β key_β⟩ },
+end
+
 instance separated.prod [separated α] [separated β] : separated (α × β) := 
 separated_def.2 $ assume x y H, prod.ext 
   (eq_of_separated_of_uniform_continuous uniform_continuous_fst H)
@@ -148,8 +165,7 @@ begin
   { let p_α := λ (p : (α × β) × α × β), ((p.fst).fst, (p.snd).fst),
     let p_β := λ (p : (α × β) × α × β), ((p.fst).snd, (p.snd).snd),
     rw uniformity_prod,
-    have h1 : filter.prod (filter.prod f g) (filter.prod f g) ≤
-    filter.vmap p_α uniformity, 
+    have h1 : filter.prod (filter.prod f g) (filter.prod f g) ≤ filter.vmap p_α uniformity, 
     { intros r r_in,
       rw filter.mem_vmap_sets at r_in,
       rcases r_in with ⟨t, t_in, ht⟩,
@@ -351,37 +367,36 @@ noncomputable def std_pkg : completion_pkg α :=
 variables {γ : Type*} [uniform_space γ] [complete_space γ] [separated γ]
 variables {α β}
 
-noncomputable
-def aux (f : α × β → γ) : β → completion α → γ :=
-λ b, completion_extension (λ a, f (a, b))
+#check (by apply_instance : setoid (α × β))
+#check quotient.induction_on₂
+
+def dense_cauchy := uniform_embedding_pure_cauchy.dense_embedding (@pure_cauchy_dense α _)
+
+lemma dense_prod : dense_embedding (λ p : α × β, (pure_cauchy p.1, pure_cauchy p.2)) :=
+dense_embedding.prod dense_cauchy dense_cauchy
 
 noncomputable
-def aux' (f' : β → completion α → γ) (x : completion α) : completion β → γ :=
-completion_extension (λ b, f' b x)
-
-lemma t  (f : α × β → γ) (h : uniform_continuous f) (x : completion α) : uniform_continuous (λ b, aux f b x) :=
+def prod_prod : (completion α) × (completion β) → completion (α × β) :=
 begin
-  have : ∀ b, uniform_continuous (λ a, f (a, b)) :=
-    λ b, uniform_continuous.comp 
-      (uniform_continuous.prod_mk uniform_continuous_id uniform_continuous_const) h,
-  have : ∀ b, uniform_continuous (completion_extension (λ a, f (a, b))) :=
-    λ b, completion_extension.uniform_continuity (this b),
-  unfold aux,
-  sorry
+  let g₀ := function.curry (dense_prod.extend (to_completion (α × β))),
+  
+  refine function.uncurry (quotient.lift₂ g₀ _),
+  { intros a₁ b₁ a₂ b₂ eqv₁ eqv₂,
+    let g₁ := dense_prod.extend (to_completion (α × β)),
+    change g₁ (a₁, b₁) = g₁ (a₂, b₂),
+    have g₁_uc : uniform_continuous g₁, 
+    { let ue : uniform_embedding (λ (p : α × β), (pure_cauchy (p.fst), pure_cauchy (p.snd))) :=
+        uniform_embedding.prod uniform_embedding_pure_cauchy uniform_embedding_pure_cauchy,
+      refine uniform_continuous_uniformly_extend ue _ (to_completion.uniform_continuous (α × β)) },
+    
+    exact eq_of_separated_of_uniform_continuous g₁_uc (separation_prod.2 ⟨eqv₁, eqv₂⟩) },
 end
 
-/-
-noncomputable
-def prod_lift (f : α × β → γ) : (completion α) × (completion β) → γ := 
-λ x, aux' (aux f) x.1 x.2
--/
 noncomputable
 def prod_lift (f : α × β → γ) : (completion α) × (completion β) → γ := 
 λ p, completion_extension (λ b, completion_extension (λ a, f (a, b)) p.1) p.2
 
 
-
-#check completion_extension.lifts'
 noncomputable def prod_pkg : completion_pkg (α × β) :=
 begin
   refine { 
@@ -410,7 +425,8 @@ begin
     let φ := λ y, g (x.1, y),
     have φ_uc : uniform_continuous φ := uniform_continuous.prod.partial2 g_uc x.1, 
     have e1 := λ b : β, completion_extension.unique (uc1 b),
-    
+    { 
+      sorry },
     
     sorry },
 end
