@@ -58,66 +58,7 @@ instance complete_space.prod [complete_space α] [complete_space β] : complete_
 
 end uniform_space
 
-local attribute [instance] classical.prop_decidable
-
-namespace uniform_space
-universes u
-variables (α : Type u) [uniform_space α]
-
-structure completion_pkg := 
-(space : Type u)
-(uniform_structure : uniform_space space)
-(completeness : complete_space space)
-(separation : separated space)
-(map : α → space)
-(uniform_continuity : uniform_continuous map)
-(lift : Π {β : Type u} [uniform_space β] [complete_space β] [separated β] (f : α → β), space → β)
-(lift_uc : ∀ {β : Type u} [uniform_space β] [complete_space β] [separated β] {f : α → β},
-           uniform_continuous f → uniform_continuous (lift f))
-(lift_lifts : ∀ {β : Type u} [uniform_space β] [complete_space β] [separated β] {f : α → β},
-           uniform_continuous f → f = (lift f) ∘ map)
-(lift_unique : ∀ {β : Type u} [uniform_space β] [complete_space β] [separated β] 
-           {f : α → β} (h : uniform_continuous f) {g : space → β}, 
-           uniform_continuous g → f = g ∘ map → g = lift f)
-
-attribute [instance]
-  completion_pkg.uniform_structure
-  completion_pkg.completeness
-  completion_pkg.separation
-
-namespace completion_pkg
-variables (pkg pkg' : completion_pkg α) {α}
-
-def compare (pkg pkg' : completion_pkg α) : pkg.space → pkg'.space := 
-pkg.lift pkg'.map
-
-lemma uniform_continuous_compare : uniform_continuous (compare pkg pkg') :=
-pkg.lift_uc pkg'.uniform_continuity
-
-lemma lifts_compare : pkg'.map = (compare pkg pkg') ∘ pkg.map :=
-pkg.lift_lifts pkg'.uniform_continuity
-
-lemma compare_iso_aux : (compare pkg' pkg) ∘ (compare pkg pkg') = id :=
-begin
-  let c  := compare pkg' pkg,
-  let c_uc := uniform_continuous_compare pkg' pkg,
-  have c_lifts : pkg.map = c ∘ pkg'.map := lifts_compare pkg' pkg,
-  
-  let c' := compare pkg pkg',
-  let c'_uc := uniform_continuous_compare pkg pkg',
-  have c'_lifts : pkg'.map = c' ∘ pkg.map := lifts_compare pkg pkg',
-
-  have id_lifts : id = pkg.lift (pkg.map) := 
-    pkg.lift_unique pkg.uniform_continuity uniform_continuous_id (by simp),
-  rw id_lifts,
-
-  apply pkg.lift_unique pkg.uniform_continuity (uniform_continuous.comp c'_uc c_uc),
-  change pkg.map = c ∘ c' ∘ pkg.map,
-  cc
-end
-
-end completion_pkg
-end uniform_space
+local attribute [instance, priority 0] classical.prop_decidable
 
 local attribute [instance] separation_setoid
 
@@ -193,6 +134,9 @@ open set
 lemma uniform_continuous : uniform_continuous (to_completion α) :=
 uniform_continuous.comp uniform_embedding_pure_cauchy.uniform_continuous 
   uniform_continuous_quotient_mk
+
+lemma continuous : continuous (to_completion α) :=
+uniform_continuous.continuous (uniform_continuous α)
 
 lemma dense : closure (range (to_completion α)) = univ   :=
 begin
@@ -275,6 +219,9 @@ begin
   exact filter.image_mem_map (g₀_unif r_in)
 end
 
+lemma continuity : continuous (completion_extension f) :=
+uniform_continuous.continuous (uniform_continuity H)
+
 lemma unique {h : completion α → β} :
   uniform_continuous h → f = (h ∘ to_completion α) → h = completion_extension f :=
 begin
@@ -286,28 +233,13 @@ begin
   have closed_eq : is_closed {x | h x = g x} := is_closed_eq h_unif.continuous g_unif.continuous,
   have : f = g ∘ to_completion α := lifts H,
   have eq_on_α : ∀ x, (h ∘ to_completion α) x = (g ∘ to_completion α) x, by cc,
-  apply is_closed_property (to_completion.dense α) closed_eq eq_on_α x,
+  exact (is_closed_property (to_completion.dense α) closed_eq eq_on_α x : _)
 end
 end completion_extension
 
 namespace completion
-variables (α : Type*) [uniform_space α] (β : Type*) [uniform_space β]
+variables {α : Type*} [uniform_space α] {β : Type*} [uniform_space β]
 open uniform_space
-
-noncomputable def std_pkg : completion_pkg α :=
-{ space := completion α,
-  uniform_structure := by apply_instance,
-  completeness := by apply_instance,
-  separation := by apply_instance,
-  map := to_completion _,
-  uniform_continuity := to_completion.uniform_continuous _,
-  lift := @completion_extension _ _,
-  lift_uc := @completion_extension.uniform_continuity _ _,
-  lift_lifts := @completion_extension.lifts _ _,
-  lift_unique := @completion_extension.unique _ _ }
-
-variables {γ : Type*} [uniform_space γ] [complete_space γ] [separated γ]
-variables {α β}
 
 def dense_cauchy := uniform_embedding_pure_cauchy.dense_embedding (@pure_cauchy_dense α _)
 
@@ -332,55 +264,26 @@ end
 
 lemma prod_prod.uc : uniform_continuous (@prod_prod α _ β _) :=
 begin
-  simp [uncurry_def, prod_prod],
+  dsimp[prod_prod],
+  rw uncurry_def,
   apply uniform_continuous_quotient_lift₂,
   suffices : uniform_continuous (dense_embedding.extend dense_prod (to_completion (α × β))),
   by simpa,
-  apply @uniform_continuous_uniformly_extend _ _ _ _ _ _ _ _ _ _ _ _ _,
-  all_goals { sorry },
+  exact uniform_continuous_uniformly_extend  
+    (uniform_embedding.prod uniform_embedding_pure_cauchy uniform_embedding_pure_cauchy)
+    dense_prod.dense (to_completion.uniform_continuous _)
 end
 
-lemma prod_prod_lift (a : α) (b : β) : @prod_prod α _ β _ (a, b) = (a, b) := sorry
-
-noncomputable
-def prod_lift (f : α × β → γ) : (completion α) × (completion β) → γ := 
-λ p, completion_extension (λ b, completion_extension (λ a, f (a, b)) p.1) p.2
-
-
-noncomputable def prod_pkg : completion_pkg (α × β) :=
+lemma prod_prod_lift (a : α) (b : β) : @prod_prod α _ β _ (a, b) = (a, b) := 
 begin
-  refine { 
-    space := completion α × completion β,
-    uniform_structure := by apply_instance,
-    completeness := by apply_instance,
-    separation := by apply_instance,
-    map := λ x, (x.1, x.2),
-    uniform_continuity := uniform_continuous.prod_mk 
-      (uniform_continuous.comp uniform_continuous_fst $ to_completion.uniform_continuous _) 
-      (uniform_continuous.comp uniform_continuous_snd $ to_completion.uniform_continuous _),
-    lift := @prod_lift _ _ _ _, .. } ;
-  intros γ γ_us γ_cs γ_sep f f_uc ; letI := γ_us ; letI := γ_cs ; letI := γ_sep ;
-  have uc1 := uniform_continuous.prod.partial1 f_uc ;
-  have uc2 := uniform_continuous.prod.partial2 f_uc,
-  { --apply uniform_continuous.prod_mk,
-    sorry },
-  { ext x,
-    dsimp[prod_lift],
-    
-    have e1 := λ b : β, eq.symm (completion_extension.lifts' (uc1 b) x.1),
-    have e2 := λ a : α, eq.symm (completion_extension.lifts' (uc2 a) x.2),
-    simp[e1,e2] },
-  { intros g g_uc g_extends,
-    ext x,
-    let φ := λ y, g (x.1, y),
-    have φ_uc : uniform_continuous φ := uniform_continuous.prod.partial2 g_uc x.1, 
-    have e1 := λ b : β, completion_extension.unique (uc1 b),
-    { 
-      sorry },
-    
-    sorry },
-end
+  let f := to_completion (α × β),
+  change dense_embedding.extend dense_prod f (pure_cauchy a, pure_cauchy b) = ⟦pure_cauchy (a, b)⟧,
 
+  have hf : filter.tendsto f (nhds (a, b)) (nhds (f (a,b))) := 
+    continuous.tendsto (to_completion.continuous _) _,
+
+  exact (dense_prod.extend_e_eq hf : _)
+end
 
 end completion
 
