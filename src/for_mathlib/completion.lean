@@ -261,6 +261,9 @@ variables {g : β → γ} (H' : uniform_continuous g)
 lemma lifts : (to_completion β) ∘ f = (completion.map f) ∘ to_completion α :=
 completion_extension.lifts $ uniform_continuous.comp H (to_completion.uniform_continuous β)
 
+lemma lifts' : ∀ a : α, (f a : completion β) = (completion.map f) a :=
+congr_fun (lifts H)
+
 lemma unique {f' : completion α → completion β} :
   uniform_continuous f' → (to_completion β) ∘ f = f' ∘ to_completion α → f' = completion.map f :=
 completion_extension.unique $ uniform_continuous.comp H (to_completion.uniform_continuous β)

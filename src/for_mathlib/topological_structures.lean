@@ -1,7 +1,19 @@
 import analysis.topology.topological_structures
 
 import for_mathlib.completion
+import for_mathlib.function
 
+section
+variables {α : Type*} {β : Type*} {γ : Type*}
+
+lemma continuous_pat_perm [topological_space α] [topological_space β] [topological_space γ] : 
+  continuous (λ x : α × β × γ, (x.2.2, (x.1, x.2.1))) :=
+have c : continuous (λ x : α × β × γ, x.2.2) :=
+   continuous.comp continuous_snd continuous_snd,
+have c' : continuous (λ x : α × β × γ, (x.1, x.2.1)) :=
+ continuous.prod_mk continuous_fst (continuous.comp continuous_snd continuous_fst), 
+continuous.prod_mk c c'
+end
 open filter
 
 lemma set.preimage_subset_iff {α : Type*} {β : Type*} {A : set α} {B : set β} {f : α → β} :
@@ -183,34 +195,67 @@ end topological_add_comm_group
 
 section topological_add_comm_group_completion
 universe u
+variables {α : Type*} [uniform_space α]
 variables (G : Type u) [add_comm_group G] [topological_space G] [topological_add_group G]  
 
-open uniform_space function set
+open uniform_space function set uniform_space.to_completion
+
+lemma uniform_continuous_add'' [add_group α] [uniform_add_group α] :
+uniform_continuous (uncurry add_semigroup.add : α × α → α) :=
+by rw uncurry_def ; exact uniform_continuous_add'
+
+noncomputable
+def uncurry_add : completion G × completion G → completion G := 
+  completion.map (uncurry add_semigroup.add) ∘ completion.prod
+
 
 noncomputable instance : has_add (completion G) := 
-  ⟨curry ((completion.map (function.uncurry ((+) : G → G → G))) ∘ completion.prod)⟩
+  ⟨curry (uncurry_add G)⟩
 
 instance : has_zero (completion G) := ⟨(0:G)⟩
 
 noncomputable instance : has_neg (completion G) := ⟨completion.map (λ x, -x)⟩
 
 variable {G}
-lemma add_add (a b : G) : (a : completion G) + (b : completion G) = (a + b : G) := sorry
+lemma completion.add_lift (a b : G) : (a : completion G) + (b : completion G) = (a + b : G) := 
+begin
+  change (completion.map (uncurry add_semigroup.add) ∘ completion.prod) (↑a, ↑b) =  (to_completion G ∘ uncurry add_semigroup.add) (a, b),
+  rw [completion.map.lifts uniform_continuous_add'', comp_apply, completion.prod.lift],
+  refl,
+  apply_instance
+end
 
-lemma completion.neg_neg (a : G) : -(a : completion G) = (-a : G) := sorry
 
--- We will also need continuity properties for these operations, see the sorries in the group instance
+lemma completion.neg_lift (a : G) : -(a : completion G) = (-a : G) := 
+begin
+  rw [completion.map.lifts' uniform_continuous_neg'],
+  refl,
+  apply_instance
+end
 
-lemma dense₁ : closure (range (λ x : G, (x : completion G))) = univ := 
-to_completion.dense G
+lemma completion.uniform_continuous_add' : uniform_continuous (uncurry_add G) := 
+uniform_continuous.comp completion.prod.uc (completion.map.uniform_continuity (@uniform_continuous_add'' G _ _ _))
 
-lemma dense₂ : let H := completion G in let φ : G × G → H × H := λ x, ⟨x.1, x.2⟩ in 
-  closure (range φ) = univ := 
-sorry
+lemma completion.uniform_continuous_add {f g : α → completion G} (hf : uniform_continuous f) (hg : uniform_continuous g) : uniform_continuous (λ x, f x + g x) := 
+uniform_continuous.comp (uniform_continuous.prod_mk hf hg) completion.uniform_continuous_add'
 
-lemma dense₃ : let H := completion G in let φ : G × G × G → H × H × H := λ x, ⟨x.1, x.2.1, x.2.2⟩ in 
-  closure (range φ) = univ := 
-sorry
+lemma completion.continuous_add' : continuous (uncurry_add G) := 
+uniform_continuous.continuous completion.uniform_continuous_add'
+
+lemma completion.continuous_add {f g : α → completion G} (hf : continuous f) (hg : continuous g) : continuous (λ x, f x + g x) := 
+continuous.comp (continuous.prod_mk hf hg) completion.continuous_add'
+
+lemma completion.uniform_continuous_neg' : uniform_continuous (λ x : completion G, -x) := 
+completion.map.uniform_continuity uniform_continuous_neg'
+
+lemma completion.uniform_continuous_neg {f : α → completion G} (hf : uniform_continuous f) : uniform_continuous (λ x, -f x) := 
+uniform_continuous.comp hf completion.uniform_continuous_neg'
+
+lemma completion.continuous_neg' : continuous (λ x : completion G, -x) := 
+uniform_continuous.continuous completion.uniform_continuous_neg'
+
+lemma completion.continuous_neg {f : α → completion G} (hf : continuous f) : continuous (λ x, -f x) := 
+continuous.comp hf completion.continuous_neg'
 
 noncomputable
 instance completion_group_str : add_comm_group (completion G) := 
@@ -222,28 +267,37 @@ begin
     neg := completion.map (λ x, -x),
   },
   { intros a b c,
-    have closed : is_closed {x : H × H × H | x.1 + x.2.1 + x.2.2 = x.1 + (x.2.1 + x.2.2) }, sorry,
-    have := is_closed_property dense₃ closed (by {intro a, repeat { rw add_add }, rw add_assoc }),
+    have closed : is_closed {x : H × H × H | x.1 + x.2.1 + x.2.2 = x.1 + (x.2.1 + x.2.2) }, 
+    { have c₀ : continuous (λ x : H × H, x.1 + x.2), 
+      { change continuous (λ (x : H × H), (uncurry_add G) (x.fst, x.snd)),
+        simp[completion.continuous_add'] },
+      have c₁ : continuous (λ x : H × (H × H), (x.1 + x.2.1) + x.2.2), 
+      { have c : continuous (λ x : H × (H × H), (x.2.1 + x.2.2) + x.1) :=
+          completion.continuous_add (continuous.comp continuous_snd c₀) continuous_fst,
+        exact continuous.comp continuous_pat_perm c },
+      have c₂ : continuous (λ x : H × (H × H), x.1 + (x.2.1 + x.2.2)) := 
+        completion.continuous_add continuous_fst (continuous.comp continuous_snd c₀),
+      exact is_closed_eq c₁ c₂ },
+    have := is_closed_property dense₃ closed (by {intro a, repeat { rw completion.add_lift }, rw add_assoc }),
     exact this ⟨a, b, c⟩ },
-  { have closed : is_closed {x : H | 0 + x = x }, 
-    { have : continuous (λ x : H, 0 + x), sorry,
-      exact is_closed_eq this continuous_id },
-    exact is_closed_property dense₁ closed (by {intro x, rw add_add, rw zero_add}) },
-  { have closed : is_closed {x : H | x + (0:G) = x }, 
-    { have : continuous (λ x : H, x + (0:G)), sorry,
-      exact is_closed_eq this continuous_id },
-    exact is_closed_property dense₁ closed (by {intro x, rw add_add, rw add_zero}) },
-  { have closed : is_closed {x : H | -x + x = (0:G)}, 
-    { have : continuous (λ x : H, -x + x), sorry,
-      exact is_closed_eq this continuous_const },
-    have := is_closed_property dense₁ closed (by {intro x, rw completion.neg_neg, rw add_add, rw add_left_neg }),
+  { have closed : is_closed {x : H | 0 + x = x } := 
+      is_closed_eq (completion.continuous_add continuous_const continuous_id) continuous_id,
+    exact is_closed_property dense₁ closed (by {intro x, rw completion.add_lift, rw zero_add}) },
+  { have closed : is_closed {x : H | x + (0:G) = x } :=
+      is_closed_eq (completion.continuous_add continuous_id continuous_const) continuous_id ,
+    exact is_closed_property dense₁ closed (by {intro x, rw completion.add_lift, rw add_zero}) },
+  { have closed : is_closed {x : H | -x + x = (0:G)} :=
+     is_closed_eq (completion.continuous_add completion.continuous_neg' continuous_id) continuous_const,
+    have := is_closed_property dense₁ closed (by {intro x, rw completion.neg_lift, rw completion.add_lift, rw add_left_neg }),
     exact this },
   { intros a b,
     have closed : is_closed {x : H × H | x.1 + x.2 = x.2 + x.1 }, 
-    { have c₁ : continuous (λ x : H × H, x.1 + x.2), sorry,
-      have c₂ : continuous (λ x : H × H, x.2 + x.1), sorry,
-      exact is_closed_eq c₁ c₂ },
-    have := is_closed_property dense₂ closed (by {intro a, repeat { rw add_add }, rw add_comm }),
+    { have c₁ : continuous (λ x : H × H, x.1 + x.2), 
+      { change continuous (λ (x : H × H), (uncurry_add G) (x.fst, x.snd)),
+        simp[completion.continuous_add'] },
+      
+      exact is_closed_eq c₁ (continuous.comp continuous_swap c₁) },
+    have := is_closed_property dense₂ closed (by {intro a, repeat { rw completion.add_lift }, rw add_comm }),
     exact this ⟨a, b⟩ },
 end
 
@@ -254,6 +308,6 @@ instance to_completion_mph : is_add_group_hom (to_completion G) :=
 ⟨begin
   intros a b,
   change ↑(a + b)= ↑a + ↑b,
-  exact eq.symm (add_add a b)
+  exact eq.symm (completion.add_lift a b)
 end⟩
 end topological_add_comm_group_completion
