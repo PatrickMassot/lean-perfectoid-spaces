@@ -28,13 +28,13 @@ different perspective in order to reuse material in analysis.topology.uniform_sp
 -/
 
 import analysis.topology.uniform_space
+import analysis.topology.continuity
 import data.set.function
 
 import for_mathlib.quotient
 import for_mathlib.continuity
 import for_mathlib.uniform_space
 import for_mathlib.function
-import for_mathlib.topological_space
 
 local attribute [instance, priority 0] classical.prop_decidable
 
@@ -97,7 +97,7 @@ begin
     dsimp[φ],
     unfold_coes,
     simp[prod.ext_iff] },
-  simp [this, closure_prod, dense]
+  simp [this, closure_prod_eq, dense]
 end
 
 lemma dense₃ : let β := completion α in let φ : α × α × α → β × β × β := λ x, ⟨x.1, x.2.1, x.2.2⟩ in 
@@ -109,7 +109,7 @@ begin
     dsimp[φ],
     unfold_coes,
     simp[prod.ext_iff] },
-  simp [this, closure_prod, dense]
+  simp [this, closure_prod_eq, dense]
 end
 end to_completion
 
