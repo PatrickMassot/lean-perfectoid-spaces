@@ -188,7 +188,7 @@ variables (G : Type u) [add_comm_group G] [topological_space G] [topological_add
 open uniform_space function set
 
 noncomputable instance : has_add (completion G) := 
-  ⟨curry ((completion.map (function.uncurry ((+) : G → G → G))) ∘ completion.prod_prod)⟩
+  ⟨curry ((completion.map (function.uncurry ((+) : G → G → G))) ∘ completion.prod)⟩
 
 instance : has_zero (completion G) := ⟨(0:G)⟩
 
@@ -217,7 +217,7 @@ instance completion_group_str : add_comm_group (completion G) :=
 begin
   let H := completion G,
   refine_struct {
-    add := curry ((completion.map (function.uncurry ((+) : G → G → G))) ∘ completion.prod_prod),
+    add := curry ((completion.map (function.uncurry ((+) : G → G → G))) ∘ completion.prod),
     zero := (0:G),
     neg := completion.map (λ x, -x),
   },
