@@ -32,6 +32,8 @@ import data.set.function
 
 import for_mathlib.quotient
 import for_mathlib.continuity
+import for_mathlib.uniform_space
+import for_mathlib.function
 
 namespace uniform_space
 variables {α : Type*} [uniform_space α] {β : Type*} [uniform_space β] {γ : Type*} [uniform_space γ]
@@ -156,77 +158,13 @@ separated_def.2 $ assume x y H, prod.ext
   (eq_of_separated_of_uniform_continuous uniform_continuous_fst H)
   (eq_of_separated_of_uniform_continuous uniform_continuous_snd H)
 
-lemma prod_cauchy {f : filter α} {g : filter β} : cauchy f → cauchy g → cauchy (filter.prod f g) :=
-begin
-  rintros ⟨f_neq, f_prod⟩ ⟨g_neq, g_prod⟩,
-  split,
-  { rw filter.prod_neq_bot,
-    cc },
-  { let p_α := λ (p : (α × β) × α × β), ((p.fst).fst, (p.snd).fst),
-    let p_β := λ (p : (α × β) × α × β), ((p.fst).snd, (p.snd).snd),
-    rw uniformity_prod,
-    have h1 : filter.prod (filter.prod f g) (filter.prod f g) ≤ filter.vmap p_α uniformity, 
-    { intros r r_in,
-      rw filter.mem_vmap_sets at r_in,
-      rcases r_in with ⟨t, t_in, ht⟩,
-      rw filter.mem_prod_iff,
-      suffices : ∃ (t₁ ∈ (filter.prod f g).sets) (t₂ ∈ (filter.prod f g).sets),
-        set.prod t₁ t₂ ⊆ p_α ⁻¹' t,
-      { rcases this with ⟨t₁, in₁, t₂, in₂, H⟩,
-        existsi [t₁, in₁, t₂, in₂],
-        exact set.subset.trans H ht },
-      
-      have t_in_ff := f_prod t_in,
-      have univ_in_gg : set.univ ∈ (filter.prod g g).sets := filter.univ_mem_sets,
-      rw filter.mem_prod_iff at t_in_ff,
-      rw filter.mem_prod_iff at univ_in_gg,
-      rcases t_in_ff with ⟨a₁, a₁_in, a₂, a₂_in, ha⟩,
-      rcases univ_in_gg with ⟨b₁, b₁_in, b₂, b₂_in, hb⟩,
-      let p₁ := set.prod a₁ b₁, 
-      have in₁ : p₁ ∈ (filter.prod f g).sets,
-      by apply filter.prod_mem_prod ; assumption,
-      let p₂ := set.prod a₂ b₂, 
-      have in₂ : p₂ ∈ (filter.prod f g).sets,
-      by apply filter.prod_mem_prod ; assumption,
-      existsi [p₁, in₁, p₂, in₂],
-      intros x x_in,
-      apply ha,
-      dsimp[p_α],
-      dsimp [p₁, p₂] at x_in,
-      dsimp[set.prod] at x_in,
-      cc },
-    have h2 : filter.prod (filter.prod f g) (filter.prod f g) ≤ filter.vmap p_β uniformity, 
-    { intros r r_in,
-      rw filter.mem_vmap_sets at r_in,
-      rcases r_in with ⟨t, t_in, ht⟩,
-      rw filter.mem_prod_iff,
-      suffices : ∃ (t₁ ∈ (filter.prod f g).sets) (t₂ ∈ (filter.prod f g).sets),
-        set.prod t₁ t₂ ⊆ p_β ⁻¹' t,
-      { rcases this with ⟨t₁, in₁, t₂, in₂, H⟩,
-        existsi [t₁, in₁, t₂, in₂],
-        exact set.subset.trans H ht },
-      
-      have t_in_gg := g_prod t_in,
-      have univ_in_ff : set.univ ∈ (filter.prod f f).sets := filter.univ_mem_sets,
-      rw filter.mem_prod_iff at t_in_gg,
-      rw filter.mem_prod_iff at univ_in_ff,
-      rcases t_in_gg with ⟨b₁, b₁_in, b₂, b₂_in, hb⟩,
-      rcases univ_in_ff with ⟨a₁, a₁_in, a₂, a₂_in, ha⟩,
-      let p₁ := set.prod a₁ b₁, 
-      have in₁ : p₁ ∈ (filter.prod f g).sets,
-      by apply filter.prod_mem_prod ; assumption,
-      let p₂ := set.prod a₂ b₂, 
-      have in₂ : p₂ ∈ (filter.prod f g).sets,
-      by apply filter.prod_mem_prod ; assumption,
-      existsi [p₁, in₁, p₂, in₂],
-      intros x x_in,
-      apply hb,
-      dsimp[p_β],
-      dsimp [p₁, p₂] at x_in,
-      dsimp[set.prod] at x_in,
-      cc },
-    exact lattice.le_inf h1 h2 },
-end
+lemma prod_cauchy {f : filter α} {g : filter β} : cauchy f → cauchy g → cauchy (filter.prod f g)
+| ⟨f_proper, hf⟩ ⟨g_proper, hg⟩ := ⟨filter.prod_neq_bot.2 ⟨f_proper, g_proper⟩,
+  let p_α := λp:(α×β)×(α×β), (p.1.1, p.2.1), p_β := λp:(α×β)×(α×β), (p.1.2, p.2.2) in
+  suffices (f.prod f).vmap p_α ⊓ (g.prod g).vmap p_β ≤ uniformity.vmap p_α ⊓ uniformity.vmap p_β,
+    by simpa [uniformity_prod, filter.prod, filter.vmap_inf, filter.vmap_vmap_comp, (∘),
+        lattice.inf_assoc, lattice.inf_comm, lattice.inf_left_comm],
+  lattice.inf_le_inf (filter.vmap_mono hf) (filter.vmap_mono hg)⟩
 
 variable (α)
 
@@ -394,19 +332,12 @@ end
 
 lemma prod_prod.uc : uniform_continuous (@prod_prod α _ β _) :=
 begin
-  
-  intros r r_in,
-  rw filter.mem_map,
-  --dsimp[completion],
-  --rw uniformity_prod,
-  rw uniformity_prod_eq_prod,
-  rw filter.mem_map,
-  
-  rw filter.mem_prod_iff,
-  change r ∈ (filter.map (λp:((Cauchy (α × β))×(Cauchy (α × β))), (⟦p.1⟧, ⟦p.2⟧)) uniformity).sets at r_in,
-  rw filter.mem_map at r_in,
-  
-  sorry,
+  simp [uncurry_def, prod_prod],
+  apply uniform_continuous_quotient_lift₂,
+  suffices : uniform_continuous (dense_embedding.extend dense_prod (to_completion (α × β))),
+  by simpa,
+  apply @uniform_continuous_uniformly_extend _ _ _ _ _ _ _ _ _ _ _ _ _,
+  all_goals { sorry },
 end
 
 lemma prod_prod_lift (a : α) (b : β) : @prod_prod α _ β _ (a, b) = (a, b) := sorry
