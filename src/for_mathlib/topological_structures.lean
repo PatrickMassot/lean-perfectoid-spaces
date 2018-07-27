@@ -198,7 +198,18 @@ end⟩
 variables {H : Type*} [add_comm_group H] [topological_space H] [topological_add_group H]  
 
 lemma uniform_continuous_of_continuous {f : G → H} [is_add_group_hom f] (h : continuous f) : 
-  uniform_continuous f := sorry
+  uniform_continuous f := 
+begin
+  simp only [uniform_continuous, uniformity_eq_vmap_nhds_zero],
+  rw [tendsto_iff_vmap, vmap_vmap_comp],
+  
+  change vmap δ (nhds 0) ≤ vmap ( λ (x : G × G), f x.2 - f x.1) (nhds 0),
+  have : (λ (x : G × G), f (x.snd) - f (x.fst)) = λ (x : G × G), f (x.snd -  x.fst),
+    by simp only [is_add_group_hom.sub f],
+  rw [this, ←tendsto_iff_vmap],
+  
+  exact tendsto.comp tendsto_vmap (is_add_group_hom.zero f ▸ continuous.tendsto h (0:G))
+end
 end topological_add_comm_group
 
 section topological_add_comm_group_completion
