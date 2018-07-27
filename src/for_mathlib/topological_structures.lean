@@ -250,6 +250,13 @@ uniform_continuous.comp (uniform_continuous.prod_mk hf hg) completion.uniform_co
 lemma completion.continuous_add' : continuous (uncurry_add G) := 
 uniform_continuous.continuous completion.uniform_continuous_add'
 
+lemma completion.continuous_add'' : continuous (λ x : (completion G) × (completion G), x.1 + x.2) :=
+begin
+  change continuous (λ (x : (completion G) × (completion G)), (uncurry_add G) (x.fst, x.snd)),
+  simp[completion.continuous_add']
+end 
+      
+
 lemma completion.continuous_add {f g : α → completion G} (hf : continuous f) (hg : continuous g) : continuous (λ x, f x + g x) := 
 continuous.comp (continuous.prod_mk hf hg) completion.continuous_add'
 
@@ -276,15 +283,13 @@ begin
   },
   { intros a b c,
     have closed : is_closed {x : H × H × H | x.1 + x.2.1 + x.2.2 = x.1 + (x.2.1 + x.2.2) }, 
-    { have c₀ : continuous (λ x : H × H, x.1 + x.2), 
-      { change continuous (λ (x : H × H), (uncurry_add G) (x.fst, x.snd)),
-        simp[completion.continuous_add'] },
+    { 
       have c₁ : continuous (λ x : H × (H × H), (x.1 + x.2.1) + x.2.2), 
       { have c : continuous (λ x : H × (H × H), (x.2.1 + x.2.2) + x.1) :=
-          completion.continuous_add (continuous.comp continuous_snd c₀) continuous_fst,
+          completion.continuous_add (continuous.comp continuous_snd completion.continuous_add'') continuous_fst,
         exact continuous.comp continuous_pat_perm c },
       have c₂ : continuous (λ x : H × (H × H), x.1 + (x.2.1 + x.2.2)) := 
-        completion.continuous_add continuous_fst (continuous.comp continuous_snd c₀),
+        completion.continuous_add continuous_fst (continuous.comp continuous_snd completion.continuous_add''),
       exact is_closed_eq c₁ c₂ },
     have := is_closed_property dense₃ closed (by {intro a, repeat { rw completion.add_lift }, rw add_assoc }),
     exact this ⟨a, b, c⟩ },
@@ -299,12 +304,8 @@ begin
     have := is_closed_property dense₁ closed (by {intro x, rw completion.neg_lift, rw completion.add_lift, rw add_left_neg }),
     exact this },
   { intros a b,
-    have closed : is_closed {x : H × H | x.1 + x.2 = x.2 + x.1 }, 
-    { have c₁ : continuous (λ x : H × H, x.1 + x.2), 
-      { change continuous (λ (x : H × H), (uncurry_add G) (x.fst, x.snd)),
-        simp[completion.continuous_add'] },
-      
-      exact is_closed_eq c₁ (continuous.comp continuous_swap c₁) },
+    have closed : is_closed {x : H × H | x.1 + x.2 = x.2 + x.1 } :=
+      is_closed_eq completion.continuous_add'' (continuous.comp continuous_swap completion.continuous_add''),
     have := is_closed_property dense₂ closed (by {intro a, repeat { rw completion.add_lift }, rw add_comm }),
     exact this ⟨a, b⟩ },
 end
@@ -314,7 +315,11 @@ instance : topological_space (completion G) := by unfold completion ; apply_inst
 instance completion_prod_top : topological_space ((completion G) × (completion G)) := by unfold completion ; apply_instance
 
 instance completion_group_top : topological_add_group (completion G) := 
-sorry
+begin
+  refine {..}, -- no idea why I cannot directly construct this instance
+  { exact completion.continuous_add'' },
+  { exact completion.continuous_neg' }
+end
 
 
 instance to_completion_mph : is_add_group_hom (to_completion G) := 
@@ -364,8 +369,8 @@ begin
   dsimp [completion.map],
   have cont : continuous (to_completion H ∘ f) := continuous.comp h (to_completion.continuous H),
   have hom : is_add_group_hom (to_completion H ∘ f), apply_instance,
-  haveI complete : complete_space (completion H) := sorry,
-  haveI sep : separated (completion H) := sorry,
+  haveI complete : complete_space (completion H) := sorry, -- dont understand why apply_instance doesn't work
+  haveI sep : separated (completion H) := sorry, -- dont understand why apply_instance doesn't work
   have := completion_extension_hom cont,
   sorry -- `exact this` doesn't work, probably because of the instance nightmare above
 end
