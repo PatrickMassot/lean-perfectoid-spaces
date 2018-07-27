@@ -219,8 +219,7 @@ begin
         uniform_embedding.prod uniform_embedding_pure_cauchy uniform_embedding_pure_cauchy,
       refine uniform_continuous_uniformly_extend ue _ (to_completion.uniform_continuous (α × β)) },
     
-    have := eq_of_separated_of_uniform_continuous g₁_uc (separation_prod.2 ⟨eqv₁, eqv₂⟩),
-    exact this },
+    exact (eq_of_separated_of_uniform_continuous g₁_uc (separation_prod.2 ⟨eqv₁, eqv₂⟩) : _) },
 end
 
 lemma prod.uc : uniform_continuous (@prod α _ β _) :=

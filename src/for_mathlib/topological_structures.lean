@@ -2,10 +2,13 @@ import analysis.topology.topological_structures
 
 import for_mathlib.completion
 import for_mathlib.function
+import for_mathlib.is_add_group_hom
 
 section
 variables {α : Type*} {β : Type*} {γ : Type*}
-
+/-- This is a helper lemma for associativity of addition in `completion_group_str`. 
+    It could probably be inlined. TODO: prove every permutation of a finite product 
+    of top spaces is continuous. -/
 lemma continuous_pat_perm [topological_space α] [topological_space β] [topological_space γ] : 
   continuous (λ x : α × β × γ, (x.2.2, (x.1, x.2.1))) :=
 have c : continuous (λ x : α × β × γ, x.2.2) :=
@@ -191,6 +194,11 @@ instance topological_add_group_is_uniform : uniform_add_group G :=
   conv { for (nhds _) [3] { rw [show (0:G) = 0 - 0, by simp] }},
   exact tendsto_sub (tendsto.comp tendsto_vmap tendsto_fst) (tendsto.comp tendsto_vmap tendsto_snd),
 end⟩
+
+variables {H : Type*} [add_comm_group H] [topological_space H] [topological_add_group H]  
+
+lemma uniform_continuous_of_continuous {f : G → H} [is_add_group_hom f] (h : continuous f) : 
+  uniform_continuous f := sorry
 end topological_add_comm_group
 
 section topological_add_comm_group_completion
@@ -301,8 +309,13 @@ begin
     exact this ⟨a, b⟩ },
 end
 
-class is_add_group_hom {α : Type*} {β : Type*} [add_group α] [add_group β] (f : α → β) : Prop :=
-(mul : ∀ a b : α, f (a + b) = f a + f b)
+-- The following two instances seem to be necessary to short-circuit what would otherwise be class instance resolution loops
+instance : topological_space (completion G) := by unfold completion ; apply_instance
+instance completion_prod_top : topological_space ((completion G) × (completion G)) := by unfold completion ; apply_instance
+
+instance completion_group_top : topological_add_group (completion G) := 
+sorry
+
 
 instance to_completion_mph : is_add_group_hom (to_completion G) := 
 ⟨begin
@@ -310,4 +323,50 @@ instance to_completion_mph : is_add_group_hom (to_completion G) :=
   change ↑(a + b)= ↑a + ↑b,
   exact eq.symm (completion.add_lift a b)
 end⟩
+
+variables {H : Type u} [add_comm_group H] [topological_space H] [topological_add_group H] 
+
+instance completion_extension_hom [complete_space H] [separated H] 
+  {f : G → H} [is_add_group_hom f] (h : continuous f) : 
+  is_add_group_hom (completion_extension f) :=
+⟨begin
+  
+  let GG := completion G,
+  let ff := completion_extension f,
+  have f_uc := uniform_continuous_of_continuous h,
+  have ff_c : continuous ff := completion_extension.continuity f_uc,
+    
+  have closed : is_closed {x : GG × GG | ff (x.1 + x.2) = ff x.1 + ff x.2 },
+  { have c₀ : continuous (λ x : GG × GG, x.1 + x.2), 
+      { change continuous (λ (x : GG × GG), (uncurry_add G) (x.fst, x.snd)),
+        simp[completion.continuous_add'] },
+    
+    have c₁ : continuous (λ a : GG × GG, ff a.1) := continuous.comp continuous_fst ff_c,
+    have c₂ : continuous (λ a : GG × GG, ff a.2) := continuous.comp continuous_snd ff_c,
+    
+    haveI t2 : t2_space H := separated_t2, -- No idea why this is needed
+    exact is_closed_eq  (continuous.comp c₀ ff_c) (continuous_add c₁ c₂) },
+  have eq_on_G : ∀ (a : G × G), ff (a.1 +  a.2) = ff a.1 + ff a.2,
+  { rintro ⟨a, b⟩,
+      dsimp[ff],
+      rw completion.add_lift,
+      repeat { rw ←completion_extension.lifts' f_uc },
+      rw is_add_group_hom.add f },
+    
+  have := is_closed_property dense₂ closed eq_on_G,
+  
+  exact λ a b, this (a, b),
+end⟩
+
+instance completion_map_hom {f : G → H} [is_add_group_hom f] (h : continuous f) :
+  is_add_group_hom (completion.map f) :=
+begin
+  dsimp [completion.map],
+  have cont : continuous (to_completion H ∘ f) := continuous.comp h (to_completion.continuous H),
+  have hom : is_add_group_hom (to_completion H ∘ f), apply_instance,
+  haveI complete : complete_space (completion H) := sorry,
+  haveI sep : separated (completion H) := sorry,
+  have := completion_extension_hom cont,
+  sorry -- `exact this` doesn't work, probably because of the instance nightmare above
+end
 end topological_add_comm_group_completion
